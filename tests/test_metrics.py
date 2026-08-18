@@ -1,7 +1,8 @@
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from Trading.src.reports.metrics import calculate_metrics
+from Trading.src.reports.metrics import calculate_annualized_return
 from Trading.src.reports.metrics import calculate_max_drawdown
 from Trading.src.backtest.engine import PositionSide, Trade
 from Trading.src.backtest.engine import BacktestResult, EquityPoint
@@ -41,6 +42,7 @@ class MetricsTests(unittest.TestCase):
 
         self.assertEqual(metrics.total_pnl, 0.0)
         self.assertEqual(metrics.total_return, 0.0)
+        self.assertEqual(metrics.annualized_return, 0.0)
         self.assertEqual(metrics.max_drawdown, 0.0)
         self.assertEqual(metrics.trade_count, 0)
         self.assertEqual(metrics.win_rate, 0.0)
@@ -91,6 +93,21 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(metrics.trade_count, 2)
         self.assertAlmostEqual(metrics.win_rate, 0.5)
         self.assertAlmostEqual(metrics.average_pnl, 5.0)   
+
+    def test_calculates_annualized_return(self) -> None:
+        start = datetime(2024, 1, 1)
+        result = BacktestResult(
+            initial_cash=100,
+            final_cash=121,
+            equity_curve=[
+                EquityPoint(start, 100),
+                EquityPoint(start + timedelta(days=365, hours=6), 121),
+            ],
+        )
+        
+        metrics = calculate_metrics(result)
+
+        self.assertAlmostEqual(metrics.annualized_return, 0.21)
      
 
 if __name__ == "__main__":

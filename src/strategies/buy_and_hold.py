@@ -13,8 +13,6 @@ class BuyAndHoldStrategy(BaseStrategy):
         self.has_bought = False
 
     def generate_signal(self, ohlcv: list[Bar]) -> Signal:
-        if not ohlcv:
-            return Signal.NONE
         if not self.has_bought:
             self.has_bought = True
             return Signal.BUY

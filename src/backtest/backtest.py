@@ -53,10 +53,22 @@ def demo(
     metrics: Metrics = calculate_metrics(result)
     print("总盈亏:", round(metrics.total_pnl, 2))
     print("总收益率:", round(metrics.total_return * 100, 2), "%")
+    print("年化收益率:", round(metrics.annualized_return * 100, 2), "%")
     print("最大回撤:", round(metrics.max_drawdown * 100, 2), "%")
     print("交易次数:", metrics.trade_count)
     print("胜率:", round(metrics.win_rate * 100, 2), "%")
     print("平均每笔盈亏:", round(metrics.average_pnl, 2))
+
+    if strategy_name != "buy_and_hold":
+        benchmark_result = engine.run(ohlcv, BuyAndHoldStrategy())
+        benchmark_metrics = calculate_metrics(benchmark_result)
+        print("买入持有基准年化收益率:", round(benchmark_metrics.annualized_return * 100, 2), "%")
+        print("买入持有基准最大回撤:", round(benchmark_metrics.max_drawdown * 100, 2), "%")
+        print(
+            "年化超额收益:",
+            round((metrics.annualized_return - benchmark_metrics.annualized_return) * 100, 2),
+            "%",
+        )
     
     interval = loader.get_interval(ohlcv)
     output_path = generate_equity_curve_plot(result.equity_curve)

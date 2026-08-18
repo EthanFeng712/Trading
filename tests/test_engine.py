@@ -4,6 +4,7 @@ import unittest
 from Trading.src.backtest.engine import SimpleBacktestEngine
 from Trading.src.data.data_loader import Bar
 from Trading.src.strategies.base import Signal
+from Trading.src.strategies.buy_and_hold import BuyAndHoldStrategy
 
 
 class ScheduledStrategy:
@@ -76,6 +77,17 @@ class SimpleBacktestEngineTests(unittest.TestCase):
 
         self.assertEqual(len(result.trades), 1)
         self.assertEqual(result.trades[0].entry_index, 1)
+
+    def test_buy_and_hold_enters_at_the_first_bar_open(self) -> None:
+        engine = SimpleBacktestEngine(initial_cash=100, commission_rate=0, position_size=1)
+
+        result = engine.run(make_bars([100, 120]), BuyAndHoldStrategy())
+
+        trade = result.trades[0]
+        self.assertEqual(trade.entry_index, 0)
+        self.assertEqual(trade.entry_price, 100)
+        self.assertEqual(trade.exit_price, 120)
+        self.assertEqual(result.final_cash, 120)
 
     def test_invalid_account_configuration_is_rejected(self) -> None:
         invalid_configs = [
