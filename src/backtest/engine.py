@@ -26,27 +26,18 @@ class Trade:
     pnl: float | None = None # 本单盈亏
 
 
-@dataclass
+@dataclass(frozen=True)
 class EquityPoint:
     timestamp: datetime
     equity: float
 
 
-@dataclass
+@dataclass(frozen=True)
 class BacktestResult:
     initial_cash: float
     final_cash: float
     equity_curve: list[EquityPoint] = field(default_factory=list)
     trades: list[Trade] = field(default_factory=list)
-
-    def total_pnl(self) -> float:
-        return self.final_cash - self.initial_cash
-
-    def win_rate(self) -> float:
-        if not self.trades:
-            return 0.0
-        wins = sum(1 for trade in self.trades if trade.pnl > 0)
-        return wins / len(self.trades)
 
 
 class SimpleBacktestEngine:

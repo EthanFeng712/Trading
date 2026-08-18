@@ -7,6 +7,8 @@ from ..reports.trade_log import generate_trade_log_csv
 from ..strategies.base import BaseStrategy
 from ..strategies.buy_and_hold import BuyAndHoldStrategy
 from ..strategies.sma_cross import SmaCrossStrategy
+from ..reports.metrics import calculate_metrics
+from ..reports.metrics import Metrics
 from .engine import SimpleBacktestEngine
 
 
@@ -48,9 +50,13 @@ def demo(
     print("数据文件:", csv_path)
     print("初始资金:", result.initial_cash)
     print("最终资金:", round(result.final_cash, 2))
-    print("总盈亏:", round(result.total_pnl(), 2))
-    print("交易次数:", len(result.trades))
-    print("胜率:", round(result.win_rate() * 100, 2), "%")
+    metrics: Metrics = calculate_metrics(result)
+    print("总盈亏:", round(metrics.total_pnl, 2))
+    print("总收益率:", round(metrics.total_return * 100, 2), "%")
+    print("最大回撤:", round(metrics.max_drawdown * 100, 2), "%")
+    print("交易次数:", metrics.trade_count)
+    print("胜率:", round(metrics.win_rate * 100, 2), "%")
+    print("平均每笔盈亏:", round(metrics.average_pnl, 2))
     
     interval = loader.get_interval(ohlcv)
     output_path = generate_equity_curve_plot(result.equity_curve)

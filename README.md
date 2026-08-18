@@ -1,8 +1,8 @@
-# Trading v1.1
+# Trading v1.2
 
 一个使用本地 CSV 历史数据的量化策略回测学习项目。它不依赖交易所 API，也不会发送真实订单。
 
-v1.1 在最小回测闭环之上，加入了可配置的 SMA 参数和核心规则的自动化测试。
+v1.2 在可配置策略与自动化测试的基础上，加入收益、风险和交易表现指标。
 
 ## 运行
 
@@ -51,6 +51,7 @@ Trading/
 │   │   └── backtest.py       # 组装并运行回测
 │   ├── reports/
 │   │   ├── equity.py         # 绘制权益曲线
+│   │   ├── metrics.py        # 计算收益、回撤和交易指标
 │   │   └── trade_log.py      # 导出交易日志 CSV
 │   └── utils/
 │       └── indicators.py     # SMA 等技术指标
@@ -59,6 +60,7 @@ Trading/
     ├── test_data_loader.py   # CSV 排序、周期和重复时间戳测试
     ├── test_engine.py        # 引擎成交、仓位与手续费规则测试
     ├── test_indicators.py    # SMA 指标计算测试
+    ├── test_metrics.py       # 回测指标计算测试
     └── test_sma_cross.py     # SMA 策略信号测试
 ```
 
@@ -91,6 +93,8 @@ timestamp,open,high,low,close,volume
 
 `output/` 目录会提交到仓库，但其中回测生成的文件会被 `.gitignore` 忽略。
 
+控制台还会输出总收益率、最大回撤、交易次数、胜率和平均单笔盈亏。
+
 ## 测试
 
 项目使用 Python 标准库 `unittest`：
@@ -99,8 +103,8 @@ timestamp,open,high,low,close,volume
 python -m unittest discover -s Trading/tests -v
 ```
 
-测试覆盖 CSV 排序与时间戳校验、SMA 指标和交叉信号、策略参数装配、成交时点、仓位限制、手续费和非法账户配置。
+测试覆盖 CSV 排序与时间戳校验、SMA 指标和交叉信号、策略参数装配、成交时点、仓位限制、手续费、收益指标和非法账户配置。
 
 ## 当前边界
 
-v1.1 是学习用的最小回测框架，尚未支持做空、加减仓、滑点、价差、限价单、多标的、最大回撤和夏普比率。
+v1.2 是学习用的最小回测框架，尚未支持做空、加减仓、滑点、价差、限价单、多标的和夏普比率。
