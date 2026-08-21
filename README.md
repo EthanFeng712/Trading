@@ -26,7 +26,7 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-安装依赖并运行：
+若是在github网页下载，请先在 PowerShell 中 `cd` 到 `Quant.py` 所在的文件夹，安装依赖并运行：
 
 ```bash
 python -m pip install -r requirements.txt
