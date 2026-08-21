@@ -2,20 +2,19 @@ from datetime import datetime, timedelta
 import unittest
 
 from Trading.src.backtest.engine import SimpleBacktestEngine
+from Trading.src.backtest.engine import PositionSide
 from Trading.src.data.data_loader import Bar
-from Trading.src.strategies.base import Signal
-from Trading.src.strategies.buy_and_hold import BuyAndHoldStrategy
 
 
 class ScheduledStrategy:
-    def __init__(self, signals: dict[int, Signal]) -> None:
-        self.signals = signals
+    def __init__(self, targets: dict[int, float]) -> None:
+        self.targets = targets
 
     def reset(self) -> None:
         pass
 
-    def generate_signal(self, bars: list[Bar]) -> Signal:
-        return self.signals.get(len(bars), Signal.NONE)
+    def generate_signal(self, bars: list[Bar]) -> float | None:
+        return self.targets.get(len(bars))
 
 
 def make_bars(prices: list[float]) -> list[Bar]:
@@ -27,81 +26,84 @@ def make_bars(prices: list[float]) -> list[Bar]:
 
 
 class SimpleBacktestEngineTests(unittest.TestCase):
-    def test_proportional_position_includes_buy_fee(self) -> None:
-        engine = SimpleBacktestEngine(initial_cash=10_000, commission_rate=0.001, position_size=0.5)
-        result = engine.run(make_bars([100, 100, 110]), ScheduledStrategy({1: Signal.BUY, 2: Signal.SELL}))
-
-        trade = result.trades[0]
-        expected_quantity = 5_000 / 100.1
-        expected_commission = expected_quantity * (0.1 + 0.11)
-        expected_pnl = (110 - 100) * expected_quantity - expected_commission
-
-        self.assertAlmostEqual(trade.quantity, expected_quantity)
-        self.assertAlmostEqual(trade.commission, expected_commission)
-        self.assertAlmostEqual(trade.pnl, expected_pnl)
-        self.assertAlmostEqual(result.final_cash, 10_000 + expected_pnl)
-
-    def test_forced_liquidation_charges_exit_fee(self) -> None:
-        engine = SimpleBacktestEngine(initial_cash=10_000, commission_rate=0.001, position_size=0.5)
-        result = engine.run(make_bars([100, 100, 110]), ScheduledStrategy({1: Signal.BUY}))
-
-        trade = result.trades[0]
-        self.assertEqual(trade.exit_index, 2)
-        self.assertEqual(trade.exit_price, 110)
-        self.assertAlmostEqual(trade.commission, trade.quantity * (0.1 + 0.11))
-        self.assertAlmostEqual(result.final_cash, 10_000 + trade.pnl)
-
-    def test_signal_executes_at_the_next_bar_open(self) -> None:
-        bars = [
-            Bar(90, 100, 80, 95, 1, datetime(2024, 1, 1)),
-            Bar(100, 110, 90, 105, 1, datetime(2024, 1, 2)),
-            Bar(110, 120, 100, 115, 1, datetime(2024, 1, 3)),
-        ]
-        engine = SimpleBacktestEngine(commission_rate=0)
-
-        result = engine.run(bars, ScheduledStrategy({1: Signal.BUY, 2: Signal.SELL}))
-
-        trade = result.trades[0]
-        self.assertEqual(trade.entry_index, 1)
-        self.assertEqual(trade.entry_price, 100)
-        self.assertEqual(trade.exit_index, 2)
-        self.assertEqual(trade.exit_price, 110)
-
-    def test_buy_signal_does_not_open_a_second_position(self) -> None:
-        engine = SimpleBacktestEngine(commission_rate=0)
-
-        result = engine.run(
-            make_bars([100, 100, 100, 100]),
-            ScheduledStrategy({1: Signal.BUY, 2: Signal.BUY, 3: Signal.SELL}),
-        )
-
+    def test_go_long_and_close_position(self) -> None:
+        engine = SimpleBacktestEngine(initial_cash=10_000, commission_rate=0.001)
+        result = engine.run(make_bars([100, 100, 110]), ScheduledStrategy({1: 1.0, 2: 0.0}))
+        
         self.assertEqual(len(result.trades), 1)
-        self.assertEqual(result.trades[0].entry_index, 1)
+        self.assertEqual(result.trades[0].entry_time, datetime(2024, 1, 2))
+        self.assertEqual(result.trades[0].exit_time, datetime(2024, 1, 3))
+        self.assertIs(result.trades[0].side, PositionSide.LONG)
+        self.assertEqual(result.trades[0].average_entry_price, 100)
+        self.assertEqual(result.trades[0].average_exit_price, 110)
+        self.assertAlmostEqual(result.trades[0].gross_pnl, 10_000 * 0.1)
+        self.assertAlmostEqual(result.trades[0].commission, 100 * 100 * 0.001 + 100 * 110 * 0.001)
+        self.assertAlmostEqual(result.trades[0].net_pnl, 1000 - 21)
+        
+    def test_go_short_and_close_position(self) -> None:
+        engine = SimpleBacktestEngine(initial_cash=10_000, commission_rate=0.001)
+        result = engine.run(make_bars([100, 100, 90]), ScheduledStrategy({1: -1.0, 2: 0.0}))
+        
+        self.assertEqual(len(result.trades), 1)
+        self.assertIs(result.trades[0].side, PositionSide.SHORT)
+        self.assertEqual(result.trades[0].average_entry_price, 100)
+        self.assertEqual(result.trades[0].average_exit_price, 90)
+        self.assertAlmostEqual(result.trades[0].gross_pnl, 10_000 * 0.1)
+        self.assertAlmostEqual(result.trades[0].commission, 100 * 100 * 0.001 + 100 * 90 * 0.001)
+        self.assertAlmostEqual(result.trades[0].net_pnl, 1000 - 19)
 
-    def test_buy_and_hold_enters_at_the_first_bar_open(self) -> None:
-        engine = SimpleBacktestEngine(initial_cash=100, commission_rate=0, position_size=1)
+    def test_stop_out_position(self) -> None:
+        engine = SimpleBacktestEngine(initial_cash=10_000, commission_rate=0.001)
+        result = engine.run(make_bars([100, 100, 90]), ScheduledStrategy({1: 1.0}))
+        
+        self.assertEqual(len(result.trades), 1)
+        self.assertEqual(result.trades[0].exit_time, datetime(2024, 1, 3))
+        self.assertEqual(result.trades[0].average_entry_price, 100)
+        self.assertEqual(result.trades[0].average_exit_price, 90)
+        self.assertAlmostEqual(result.trades[0].gross_pnl, -10_000 * 0.1)
+        self.assertAlmostEqual(result.trades[0].commission, 100 * 100 * 0.001 + 100 * 90 * 0.001)
+        self.assertAlmostEqual(result.trades[0].net_pnl, -1000 - 19)
+        
+    def test_scaling_in(self) -> None:
+        engine = SimpleBacktestEngine(initial_cash=10_000, commission_rate=0.001)
+        result = engine.run(make_bars([100, 100, 90, 110]), ScheduledStrategy({1: 0.5, 2: 1.0, 3: 0.0}))
+        
+        self.assertEqual(len(result.trades), 1)
+        self.assertEqual(result.trades[0].entry_time, datetime(2024, 1, 2))
+        self.assertAlmostEqual(result.trades[0].cumulative_quantity, 105.5)
+        self.assertAlmostEqual(result.trades[0].average_entry_price, 9995 / 105.5)
+        self.assertAlmostEqual(result.trades[0].max_quantity, 105.5)
+        self.assertEqual(result.trades[0].count, 3)
+        self.assertAlmostEqual(result.trades[0].commission, 5 + 4.995 + 11.605)
+        self.assertAlmostEqual(result.trades[0].net_pnl, 1610 - 21.6)
 
-        result = engine.run(make_bars([100, 120]), BuyAndHoldStrategy())
-
-        trade = result.trades[0]
-        self.assertEqual(trade.entry_index, 0)
-        self.assertEqual(trade.entry_price, 100)
-        self.assertEqual(trade.exit_price, 120)
-        self.assertEqual(result.final_cash, 120)
-
-    def test_invalid_account_configuration_is_rejected(self) -> None:
-        invalid_configs = [
-            {"initial_cash": 0},
-            {"commission_rate": -0.001},
-            {"position_size": 0},
-            {"position_size": 1.1},
-        ]
-
-        for config in invalid_configs:
-            with self.subTest(config=config):
-                with self.assertRaises(ValueError):
-                    SimpleBacktestEngine(**config)
-
+    def test_scaling_out(self) -> None:
+        engine = SimpleBacktestEngine(initial_cash=10_000, commission_rate=0.001)
+        result = engine.run(make_bars([100, 100, 110, 100]), ScheduledStrategy({1: 0.5, 2: 0.2, 3: 0.0}))
+        
+        self.assertEqual(len(result.trades), 1)
+        self.assertEqual(result.trades[0].entry_time, datetime(2024, 1, 2))
+        self.assertAlmostEqual(result.trades[0].cumulative_quantity, 10_000 * 0.5 / 100)
+        self.assertAlmostEqual(result.trades[0].average_entry_price, 100)        
+        self.assertAlmostEqual(result.trades[0].average_exit_price, 106.1836363636)
+        self.assertEqual(result.trades[0].count, 3)
+        self.assertAlmostEqual(result.trades[0].commission, 5 + 3.401 + 1.9081818182)
+        self.assertAlmostEqual(result.trades[0].net_pnl, 309.1818181818 - 10.3091818182)
+        
+    def test_reversing_position(self) -> None:
+        engine = SimpleBacktestEngine(initial_cash=10_000, commission_rate=0.001)
+        result = engine.run(make_bars([100, 100, 110, 90]), ScheduledStrategy({1: 1.0, 2: -1.0, 3: 0.0}))
+        
+        self.assertEqual(len(result.trades), 2)
+        self.assertIs(result.trades[0].side, PositionSide.LONG)
+        self.assertIs(result.trades[1].side, PositionSide.SHORT)
+        
+    def test_invalid_targets(self) -> None:
+        engine = SimpleBacktestEngine(initial_cash=10_000, commission_rate=0.001)
+        with self.assertRaises(ValueError):
+            engine.run(make_bars([100, 100, 110]), ScheduledStrategy({1: 1.5}))
+        with self.assertRaises(ValueError):
+            engine.run(make_bars([100, 100, 110]), ScheduledStrategy({1: -1.5}))
 
 if __name__ == "__main__":
     unittest.main()

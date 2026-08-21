@@ -47,8 +47,8 @@ def calculate_metrics(result: BacktestResult) -> Metrics:
     annualized_return = calculate_annualized_return(result)
     max_drawdown = calculate_max_drawdown(result.equity_curve)
     trade_count = len(result.trades)
-    win_rate = sum(1 for trade in result.trades if trade.pnl is not None and trade.pnl > 0) / trade_count if trade_count > 0 else 0.0
-    average_pnl = sum(trade.pnl for trade in result.trades if trade.pnl is not None) / trade_count if trade_count > 0 else 0.0
+    win_rate = sum(1 for trade in result.trades if trade.net_pnl is not None and trade.net_pnl > 0) / trade_count if trade_count > 0 else 0.0
+    average_pnl = sum(trade.net_pnl for trade in result.trades if trade.net_pnl is not None) / trade_count if trade_count > 0 else 0.0
     
     return Metrics(
         total_pnl=total_pnl,

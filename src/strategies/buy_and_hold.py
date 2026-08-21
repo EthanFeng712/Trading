@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 from ..data.data_loader import Bar
 from .base import BaseStrategy
-from .base import Signal
 
 
 @dataclass
@@ -12,8 +11,8 @@ class BuyAndHoldStrategy(BaseStrategy):
     def reset(self) -> None:
         self.has_bought = False
 
-    def generate_signal(self, ohlcv: list[Bar]) -> Signal:
+    def generate_signal(self, ohlcv: list[Bar]) -> float:
         if not self.has_bought:
             self.has_bought = True
-            return Signal.BUY
-        return Signal.NONE
+            return 0.2
+        return None

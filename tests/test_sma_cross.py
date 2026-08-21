@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 import unittest
 
 from Trading.src.data.data_loader import Bar
-from Trading.src.strategies.base import Signal
 from Trading.src.strategies.sma_cross import SmaCrossStrategy
 
 
@@ -24,21 +23,21 @@ class SmaCrossStrategyTests(unittest.TestCase):
 
         signal = strategy.generate_signal(bars)
 
-        self.assertIs(signal, Signal.NONE)
+        self.assertIsNone(signal)
 
     def test_upward_cross_returns_buy(self) -> None:
         strategy = SmaCrossStrategy(fast_window=2, slow_window=3)
 
         signal = strategy.generate_signal(make_bars([3, 2, 1, 2, 3]))
 
-        self.assertIs(signal, Signal.BUY)
+        self.assertEqual(signal, 0.2)
 
     def test_downward_cross_returns_sell(self) -> None:
         strategy = SmaCrossStrategy(fast_window=2, slow_window=3)
 
         signal = strategy.generate_signal(make_bars([1, 2, 3, 2, 1]))
 
-        self.assertIs(signal, Signal.SELL)
+        self.assertEqual(signal, -0.2)
 
 
 if __name__ == "__main__":

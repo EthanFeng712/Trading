@@ -2,6 +2,5 @@ __pycache__/
 **/__pycache__/
 *.pyc
 output/*
-!output/.gitkeep
 .vscode/
 .env

@@ -8,6 +8,22 @@ from Trading.src.backtest.engine import PositionSide, Trade
 from Trading.src.backtest.engine import BacktestResult, EquityPoint
 
 
+def make_trade(net_pnl: float) -> Trade:
+    return Trade(
+        side=PositionSide.LONG,
+        entry_time=datetime(2024, 1, 1),
+        exit_time=datetime(2024, 1, 2),
+        average_entry_price=100,
+        average_exit_price=110,
+        cumulative_quantity=1,
+        max_quantity=1,
+        count=2,
+        gross_pnl=net_pnl,
+        commission=0,
+        net_pnl=net_pnl,
+    )
+
+
 class MetricsTests(unittest.TestCase):
     def test_calculate_max_drawdown(self) -> None:
         equity_curve = [
@@ -49,30 +65,7 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(metrics.average_pnl, 0.0)
     
     def test_metrics_with_winning_and_losing_trades(self) -> None:
-        trades = [
-            Trade(
-                side=PositionSide.LONG,
-                entry_index=0,
-                entry_price=100,
-                quantity=1,
-                buy_fee=0,
-                exit_index=1,
-                exit_price=120,
-                commission=0,
-                pnl=20,
-            ),
-            Trade(
-                side=PositionSide.LONG,
-                entry_index=2,
-                entry_price=120,
-                quantity=1,
-                buy_fee=0,
-                exit_index=3,
-                exit_price=110,
-                commission=0,
-                pnl=-10,
-            ),
-        ]
+        trades = [make_trade(20), make_trade(-10)]
         equity_curve = [
             EquityPoint(datetime(2024, 1, 1), 100),
             EquityPoint(datetime(2024, 1, 2), 120),

@@ -1,110 +1,130 @@
-# Trading v1.3
+# Trading v1.4
 
-一个使用本地 CSV 历史数据的量化策略回测学习项目。它不依赖交易所 API，也不会发送真实订单。
+一个基于本地 CSV 历史数据的量化回测学习项目。项目不依赖交易所 API，也不会发送真实订单。
 
-v1.3 在收益、风险和交易指标的基础上，加入年化收益率和 Buy-and-Hold 基准比较。
+v1.4 将策略接口升级为“目标仓位”：引擎现在支持做多、做空、加仓、减仓、平仓和反手，并记录完整持仓生命周期的交易数据。
 
-## 运行
+## 快速开始
 
-在项目上一级目录运行：
+需要 Python 3.10 或更高版本。克隆仓库后，在仓库根目录执行：
 
 ```bash
-python -m Trading
+git clone <仓库地址>
+cd Trading
+
+# 创建虚拟环境
+python -m venv .venv
 ```
 
-或直接运行：
+激活虚拟环境：
 
 ```bash
-python Trading/Quant.py
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+
+# macOS / Linux
+source .venv/bin/activate
+```
+
+安装依赖并运行：
+
+```bash
+python -m pip install -r requirements.txt
+python Quant.py
 ```
 
 - `1`：SMA 快慢均线交叉策略，可设置快慢均线窗口，默认 `10` 和 `30`
 - `2`：买入并持有策略
 
-生成收益曲线需要 `matplotlib`：
+也可以在仓库上一级目录以模块方式运行：
 
 ```bash
-pip install matplotlib
+python -m Trading
 ```
 
 ## 文件结构
 
 ```text
 Trading/
+├── __init__.py
 ├── __main__.py               # 支持 python -m Trading
 ├── Quant.py                  # 命令行入口
-├── .gitignore                # 忽略缓存、环境变量和生成的输出文件
+├── .gitignore
 ├── README.md
+├── requirements.txt          # 第三方依赖
 ├── data/
-│   └── sample.csv            # BTCUSDT 现货日线，2020-2025，UTC 时间戳
+│   └── sample.csv            # Binance BTCUSDT 现货日线示例数据
 ├── output/
-│   └── .gitkeep              # 保留目录；生成文件不会提交
+│   └──                       # 运行时自动创建；内容不会提交
 ├── src/
-│   ├── data/
-│   │   └── data_loader.py    # CSV 校验、排序、周期推断和 Bar 模型
-│   ├── strategies/
-│   │   ├── base.py           # BaseStrategy 和 Signal
-│   │   ├── sma_cross.py      # SMA 均线交叉策略
-│   │   └── buy_and_hold.py   # 买入并持有策略
+│   ├── __init__.py
 │   ├── backtest/
-│   │   ├── engine.py         # 账户、仓位、成交、手续费和交易记录
-│   │   └── backtest.py       # 组装并运行回测
+│   │   ├── __init__.py
+│   │   ├── backtest.py       # 组装并运行回测
+│   │   └── engine.py         # 账户、持仓、成交和 Trade 生命周期
+│   ├── data/
+│   │   ├── __init__.py
+│   │   └── data_loader.py    # CSV 校验、排序、周期推断和 Bar 模型
 │   ├── reports/
 │   │   ├── equity.py         # 绘制权益曲线
-│   │   ├── metrics.py        # 计算收益、回撤和交易指标
+│   │   ├── metrics.py        # 收益、回撤和交易指标
 │   │   └── trade_log.py      # 导出交易日志 CSV
+│   ├── strategies/
+│   │   ├── __init__.py
+│   │   ├── base.py           # 策略抽象接口
+│   │   ├── buy_and_hold.py   # 买入并持有策略
+│   │   └── sma_cross.py      # SMA 均线交叉策略
 │   └── utils/
 │       └── indicators.py     # SMA 等技术指标
 └── tests/
-    ├── test_backtest.py      # 策略工厂与参数装配测试
-    ├── test_data_loader.py   # CSV 排序、周期和重复时间戳测试
-    ├── test_engine.py        # 引擎成交、仓位与手续费规则测试
-    ├── test_indicators.py    # SMA 指标计算测试
-    ├── test_metrics.py       # 回测指标计算测试
-    └── test_sma_cross.py     # SMA 策略信号测试
+    ├── test_backtest.py      # 策略工厂与参数装配
+    ├── test_data_loader.py   # CSV 与时间戳处理
+    ├── test_engine.py        # 多空、加减仓、反手和手续费
+    ├── test_indicators.py    # SMA 指标
+    ├── test_metrics.py       # 回测指标
+    └── test_sma_cross.py     # SMA 策略
 ```
 
-## 数据与时间
+## 数据与回测规则
 
-CSV 必须包含：
+CSV 必须包含以下列：
 
 ```text
 timestamp,open,high,low,close,volume
 ```
 
-加载器会解析 UTC 时间戳、按时间排序，并拒绝缺失 OHLC、缺失时间戳和重复时间戳的数据。它从相邻 K 线最常见的正时间间隔推断数据周期；交易日志据此在日线时显示日期，在更短周期时保留完整时间。
-
-## 回测规则
+`data/sample.csv` 会随仓库提交，既可直接运行演示，也可作为 CSV 加载逻辑的参考数据。数据来自 Binance 公开历史数据归档（`data.binance.vision`）的 BTCUSDT 现货日线，覆盖 2020 至 2025 年；项目运行时只读取本地 CSV，不会请求 Binance API。加载器会解析 UTC 时间戳、按时间排序、拒绝重复时间戳，并推断 K 线周期。
 
 ```text
-已收盘的历史 K 线 -> 策略信号 -> 下一根 K 线 open 成交 -> 当前 close 估值
+已收盘历史 K 线 -> 策略给出目标仓位 -> 下一根 K 线 open 成交 -> 当前 close 估值
 ```
 
-- 策略输出 `BUY`、`SELL` 或 `NONE`。
-- 当前只支持做多，且同一时间只允许一个仓位，不加仓。
-- `position_size` 控制每次开仓使用的现金比例，默认值为 `0.2`。
-- 买入数量已包含买入手续费，买入与卖出手续费都会计入交易 PnL。
-- 回测结束仍有仓位时，按最后一根 K 线的 `close` 强制平仓。
+策略返回目标仓位：`1.0` 为全多，`0.2` 为 20% 多仓，`0.0` 为空仓，负数为做空，`None` 表示保持当前仓位。回测结束仍有持仓时，按最后一根 K 线的 `close` 强制平仓。
 
 输出文件：
 
-- `output/equity_curve.png`：按市场时间绘制的账户权益曲线。
-- `output/trade_log.csv`：方向、买卖时间、价格、数量、手续费和单笔 PnL。
+- `output/equity_curve.png`：账户权益曲线。
+- `output/trade_log.csv`：每笔完整交易的方向、时间、均价、累计数量、手续费和盈亏。
 
-`output/` 目录会提交到仓库，但其中回测生成的文件会被 `.gitignore` 忽略。
-
-控制台还会输出总收益率、年化收益率、最大回撤、交易次数、胜率和平均单笔盈亏。运行 SMA 策略时，还会显示同条件 Buy-and-Hold 的年化收益率、最大回撤与年化超额收益。
+控制台会输出总收益率、年化收益率、最大回撤、交易次数、胜率、平均单笔盈亏，以及相对 Buy-and-Hold 的年化超额收益。
 
 ## 测试
 
-项目使用 Python 标准库 `unittest`：
+项目使用标准库 `unittest`：
 
 ```bash
+# 在 Trading 的上一级目录执行
 python -m unittest discover -s Trading/tests -v
 ```
 
-测试覆盖 CSV 排序与时间戳校验、SMA 指标和交叉信号、策略参数装配、成交时点、仓位限制、手续费、收益、年化收益和非法账户配置。
+测试覆盖 CSV 校验、指标、策略、目标仓位、多空交易、加减仓、反手、强制平仓、手续费和回测指标。
 
-## 当前边界
+## 当前局限
 
-v1.3 是学习用的最小回测框架，尚未支持做空、加减仓、滑点、价差、限价单、多标的、外部无风险利率基准和夏普比率。
+- 仅支持单一标的和本地 CSV 数据，不连接交易所或实盘账户。
+- 订单按下一根 K 线 `open` 完全成交，尚未模拟滑点、买卖价差、部分成交和限价单。
+- 做空没有保证金、资金费率或爆仓规则。
+- 不支持杠杆交易。
+- 目标仓位为 `1.0` 时，手续费可能使现金暂时为负；资金约束尚未建模。
+- SMA Cross 目前使用固定目标仓位，尚未加入基于波动率、趋势强弱或风险预算的动态仓位管理。
+- 尚未支持多标的组合、样本外检验、参数优化、无风险利率比较和夏普比率。
