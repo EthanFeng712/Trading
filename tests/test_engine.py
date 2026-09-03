@@ -13,8 +13,8 @@ class ScheduledStrategy:
     def reset(self) -> None:
         pass
 
-    def generate_signal(self, bars: list[Bar]) -> float | None:
-        return self.targets.get(len(bars))
+    def generate_signal(self, index: int, _previous_bar: Bar | None) -> float | None:
+        return self.targets.get(index)
 
 
 def make_bars(prices: list[float]) -> list[Bar]:

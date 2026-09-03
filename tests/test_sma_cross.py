@@ -13,6 +13,17 @@ def make_bars(closes: list[float]) -> list[Bar]:
     ]
 
 
+def generate_signal_stream(strategy: SmaCrossStrategy, bars: list[Bar]) -> float | None:
+    previous_bar: Bar | None = None
+    signal: float | None = None
+
+    for index, bar in enumerate(bars):
+        signal = strategy.generate_signal(index, previous_bar)
+        previous_bar = bar
+
+    return strategy.generate_signal(len(bars), previous_bar)
+
+
 class SmaCrossStrategyTests(unittest.TestCase):
     def test_short_history_returns_none_without_error(self) -> None:
         strategy = SmaCrossStrategy(fast_window=2, slow_window=3)
@@ -21,24 +32,39 @@ class SmaCrossStrategyTests(unittest.TestCase):
             Bar(101, 101, 101, 101, 0, datetime(2024, 1, 1) + timedelta(days=1)),
         ]
 
-        signal = strategy.generate_signal(bars)
+        signal = generate_signal_stream(strategy, bars)
 
         self.assertIsNone(signal)
 
     def test_upward_cross_returns_buy(self) -> None:
         strategy = SmaCrossStrategy(fast_window=2, slow_window=3)
 
-        signal = strategy.generate_signal(make_bars([3, 2, 1, 2, 3]))
+        signal = generate_signal_stream(strategy, make_bars([3, 2, 1, 2, 3]))
 
         self.assertEqual(signal, 0.2)
 
     def test_downward_cross_returns_sell(self) -> None:
         strategy = SmaCrossStrategy(fast_window=2, slow_window=3)
 
-        signal = strategy.generate_signal(make_bars([1, 2, 3, 2, 1]))
+        signal = generate_signal_stream(strategy, make_bars([1, 2, 3, 2, 1]))
 
         self.assertEqual(signal, -0.2)
 
+    def test_reset_clears_state(self) -> None:
+        strategy = SmaCrossStrategy(fast_window=2, slow_window=3)
+        generate_signal_stream(strategy, make_bars([3, 2, 1, 2, 3]))
+
+        self.assertIsNotNone(strategy.fast.sma)
+        self.assertIsNotNone(strategy.slow.sma)
+
+        strategy.reset()
+
+        self.assertIsNone(strategy.fast.sma)
+        self.assertIsNone(strategy.slow.sma)
+        self.assertEqual(strategy.fast_sma, [])
+        self.assertEqual(strategy.slow_sma, [])
+        self.assertEqual(len(strategy.fast.closes), 0)
+        self.assertEqual(len(strategy.slow.closes), 0)
 
 if __name__ == "__main__":
     unittest.main()

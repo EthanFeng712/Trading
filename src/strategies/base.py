@@ -13,5 +13,5 @@ class BaseStrategy(ABC):
         pass
 
     @abstractmethod
-    def generate_signal(self, ohlcv: list[Bar]) -> float | None:
+    def generate_signal(self, index: int, previous_bar: Bar | None) -> float | None:
         raise NotImplementedError

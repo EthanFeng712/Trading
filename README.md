@@ -1,8 +1,8 @@
-# Trading v1.4
+# Trading v1.5
 
 一个基于本地 CSV 历史数据的量化回测学习项目。项目不依赖交易所 API，也不会发送真实订单。
 
-v1.4 将策略接口升级为“目标仓位”：引擎现在支持做多、做空、加仓、减仓、平仓和反手，并记录完整持仓生命周期的交易数据。
+v1.5 优化了回测流程：引擎逐根处理 K 线，策略根据上一根已收盘 K 线决定目标仓位。时间复杂度 O(n) 。
 
 ## 快速开始
 
@@ -75,7 +75,7 @@ Trading/
 │   │   ├── buy_and_hold.py   # 买入并持有策略
 │   │   └── sma_cross.py      # SMA 均线交叉策略
 │   └── utils/
-│       └── indicators.py     # SMA 等技术指标
+│       └── indicators.py     # 批量与滚动 SMA 等技术指标
 └── tests/
     ├── test_backtest.py      # 策略工厂与参数装配
     ├── test_data_loader.py   # CSV 与时间戳处理
@@ -96,10 +96,12 @@ timestamp,open,high,low,close,volume
 `data/sample.csv` 会随仓库提交，既可直接运行演示，也可作为 CSV 加载逻辑的参考数据。数据来自 Binance 公开历史数据归档（`data.binance.vision`）的 BTCUSDT 现货日线，覆盖 2020 至 2025 年；项目运行时只读取本地 CSV，不会请求 Binance API。加载器会解析 UTC 时间戳、按时间排序、拒绝重复时间戳，并推断 K 线周期。
 
 ```text
-已收盘历史 K 线 -> 策略给出目标仓位 -> 下一根 K 线 open 成交 -> 当前 close 估值
+上一根已收盘 K 线 -> 策略给出目标仓位 -> 当前 K 线 open 成交 -> 当前 K 线 close 估值
 ```
 
-策略返回目标仓位：`1.0` 为全多，`0.2` 为 20% 多仓，`0.0` 为空仓，负数为做空，`None` 表示保持当前仓位。回测结束仍有持仓时，按最后一根 K 线的 `close` 强制平仓。
+策略返回目标仓位：`1.0` 为全多，`0.2` 为 20% 多仓，`0.0` 为空仓，负数为做空，`None` 表示保持当前仓位。回测结束仍有持仓时，按最后一根 K 线的 `close` 结算。
+
+引擎只遍历一次行情数据，策略自行保存所需状态。
 
 输出文件：
 
@@ -114,10 +116,10 @@ timestamp,open,high,low,close,volume
 
 ```bash
 # 在 Trading 的上一级目录执行
-python -m unittest discover -s Trading/tests -v
+python -m unittest discover -s Trading\tests -p "test_*.py" -v
 ```
 
-测试覆盖 CSV 校验、指标、策略、目标仓位、多空交易、加减仓、反手、强制平仓、手续费和回测指标。
+测试覆盖 CSV 校验、批量与滚动指标一致性、策略状态重置、目标仓位、多空交易、加减仓、反手、回测结束结算、手续费和回测指标。
 
 ## 当前局限
 

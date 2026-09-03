@@ -117,24 +117,22 @@ class SimpleBacktestEngine:
         self.trades = []
         strategy.reset()
         equity_curve: list[EquityPoint] = []
+        previous_bar: Bar | None = None
 
         for i, bar in enumerate(ohlcv):
-            history = ohlcv[: i]
-            target_position: float | None = strategy.generate_signal(history)
-            if target_position is None:
-                equity_curve.append(EquityPoint(timestamp=bar.timestamp, equity=self.cash + self.position.quantity * bar.close))
-                continue
-            price = bar.open
-            position_size = self.position.quantity * price / (self.cash + self.position.quantity * price)
-            if target_position > 1.0 or target_position < -1.0:
-                raise ValueError(f"目标仓位应处于 -1 到 1 之间，策略{strategy.__class__.__name__}返回了{target_position}")
-            
-            equity = self.cash + self.position.quantity * price
-            delta_position = target_position - position_size
-            quantity = equity * delta_position / price
-            self.opt(bar, quantity, price)
+            target_position: float | None = strategy.generate_signal(i, previous_bar)
+            if target_position is not None:
+                price = bar.open
+                if target_position > 1.0 or target_position < -1.0:
+                    raise ValueError(f"目标仓位应处于 -1 到 1 之间，策略{strategy.__class__.__name__}返回了{target_position}")
+                position_size = self.position.quantity * price / (self.cash + self.position.quantity * price)
+                equity = self.cash + self.position.quantity * price
+                delta_position = target_position - position_size
+                quantity = equity * delta_position / price
+                self.opt(bar, quantity, price)
 
             equity_curve.append(EquityPoint(timestamp=bar.timestamp, equity=self.cash + self.position.quantity * bar.close))
+            previous_bar = bar
 
         if self.position.quantity != 0:
             last_price = ohlcv[-1].close
