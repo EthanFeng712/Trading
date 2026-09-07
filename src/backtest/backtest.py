@@ -42,8 +42,15 @@ def demo(
 
     strategy = build_strategy(strategy_name, param)
     cash = float(input("请输入初始资金（默认为 10000）: ") or 10000.0)
-    commission_rate = float(input("请输入手续费率（默认为 0.1%）: ") or 0.001)
-    engine = SimpleBacktestEngine(initial_cash=cash, commission_rate=commission_rate)
+    commission_rate = float(input("请输入手续费率（默认为 0.001）: ") or 0.001)
+    slippage_rate = float(input("请输入滑点率（默认为 0.0005）: ") or 0.0005)
+    maintenance_margin_rate = float(input("请输入维持保证金率（默认为 0.1）: ") or 0.1)
+    engine = SimpleBacktestEngine(
+        initial_cash=cash,
+        commission_rate=commission_rate,
+        slippage_rate=slippage_rate,
+        maintenance_margin_rate=maintenance_margin_rate,
+    )
     result = engine.run(ohlcv, strategy)
 
     print("策略回测演示")
@@ -58,10 +65,12 @@ def demo(
     print("交易次数:", metrics.trade_count)
     print("胜率:", round(metrics.win_rate * 100, 2), "%")
     print("平均每笔盈亏:", round(metrics.average_pnl, 2))
+    print("回测结束原因:", "维持保证金不足，强制平仓" if result.liquidated else "正常结束")
 
     if strategy_name != "buy_and_hold":
         benchmark_result = engine.run(ohlcv, BuyAndHoldStrategy())
         benchmark_metrics = calculate_metrics(benchmark_result)
+        print("买入并持有策略最终资金:", round(benchmark_result.final_cash, 2))
         print("买入持有基准年化收益率:", round(benchmark_metrics.annualized_return * 100, 2), "%")
         print("买入持有基准最大回撤:", round(benchmark_metrics.max_drawdown * 100, 2), "%")
         print(
@@ -69,7 +78,7 @@ def demo(
             round((metrics.annualized_return - benchmark_metrics.annualized_return) * 100, 2),
             "%",
         )
-    
+
     interval = loader.get_interval(ohlcv)
     output_path = generate_equity_curve_plot(result.equity_curve)
     log_path = generate_trade_log_csv(log=result.trades, ohlcv=ohlcv, interval=interval)

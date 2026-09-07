@@ -7,13 +7,13 @@ else:
 def main() -> None:
     print("请选择运行方式：")
     print("1. 本地回测演示（Sma交叉策略）")
-    print("2. 本地回测演示（买入并持有策略）")
+    print("2. 本地回测演示（满仓买入并持有策略）")
     choice = input("输入 1 或 2:").strip()
     if choice == "1":
         check = False
         while not check:
-            fast_window = int(input("请输入快速均线窗口大小（默认值为 10）:") or 10)
-            slow_window = int(input("请输入慢速均线窗口大小（默认值为 30）:") or 30)
+            fast_window = int(input("请输入快速均线窗口大小（默认值为 25）:") or 25)
+            slow_window = int(input("请输入慢速均线窗口大小（默认值为 99）:") or 99)
             if fast_window <= 0 or slow_window <= 0:
                 raise ValueError("窗口大小必须为正整数")
             elif fast_window >= slow_window:
@@ -29,4 +29,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
- 
+

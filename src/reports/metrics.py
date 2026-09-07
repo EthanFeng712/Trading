@@ -12,7 +12,7 @@ class Metrics:
     trade_count: int
     win_rate: float
     average_pnl: float
-    
+
 
 def calculate_max_drawdown(equity_curve: list[EquityPoint]) -> float:
     if not equity_curve:
@@ -38,7 +38,7 @@ def calculate_annualized_return(result: BacktestResult) -> float:
     if total_days <= 0:
         return 0.0
 
-    return (result.final_cash / result.initial_cash) ** (365.25 / total_days) - 1
+    return (result.final_cash / result.initial_cash) ** (365.25 / total_days) - 1 if result.final_cash > 0 else -1.0
 
 
 def calculate_metrics(result: BacktestResult) -> Metrics:
@@ -49,7 +49,7 @@ def calculate_metrics(result: BacktestResult) -> Metrics:
     trade_count = len(result.trades)
     win_rate = sum(1 for trade in result.trades if trade.net_pnl is not None and trade.net_pnl > 0) / trade_count if trade_count > 0 else 0.0
     average_pnl = sum(trade.net_pnl for trade in result.trades if trade.net_pnl is not None) / trade_count if trade_count > 0 else 0.0
-    
+
     return Metrics(
         total_pnl=total_pnl,
         total_return=total_return,
@@ -57,6 +57,6 @@ def calculate_metrics(result: BacktestResult) -> Metrics:
         max_drawdown=max_drawdown,
         trade_count=trade_count,
         win_rate=win_rate,
-        average_pnl=average_pnl
+        average_pnl=average_pnl,
     )
-    
+

@@ -1,7 +1,7 @@
 import unittest
 
-from Trading.src.utils.indicators import simple_moving_average
-from Trading.src.utils.indicators import RollingSMA
+from src.utils.indicators import simple_moving_average
+from src.utils.indicators import RollingSMA
 
 
 class SimpleMovingAverageTests(unittest.TestCase):

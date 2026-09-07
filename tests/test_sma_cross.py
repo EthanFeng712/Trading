@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
 import unittest
 
-from Trading.src.data.data_loader import Bar
-from Trading.src.strategies.sma_cross import SmaCrossStrategy
+from src.data.data_loader import Bar
+from src.strategies.sma_cross import SmaCrossStrategy
 
 
 def make_bars(closes: list[float]) -> list[Bar]:

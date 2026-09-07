@@ -7,10 +7,10 @@ from ..data.data_loader import Bar
 
 @dataclass
 class SmaCrossStrategy(BaseStrategy):
-    fast_window: int = 10
-    slow_window: int = 30
+    fast_window: int = 25
+    slow_window: int = 99
 
-    def __init__(self, fast_window: int = 10, slow_window: int = 30):
+    def __init__(self, fast_window: int = 25, slow_window: int = 99):
         if fast_window <= 0 or slow_window <= 0:
             raise ValueError("SMA 窗口必须为正数")
         if fast_window >= slow_window:

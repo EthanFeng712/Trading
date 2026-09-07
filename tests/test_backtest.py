@@ -1,8 +1,8 @@
 import unittest
 
-from Trading.src.backtest.backtest import build_strategy
-from Trading.src.strategies.buy_and_hold import BuyAndHoldStrategy
-from Trading.src.strategies.sma_cross import SmaCrossStrategy
+from src.backtest.backtest import build_strategy
+from src.strategies.buy_and_hold import BuyAndHoldStrategy
+from src.strategies.sma_cross import SmaCrossStrategy
 
 
 class BuildStrategyTests(unittest.TestCase):
@@ -10,8 +10,8 @@ class BuildStrategyTests(unittest.TestCase):
         strategy = build_strategy("sma_cross")
 
         self.assertIsInstance(strategy, SmaCrossStrategy)
-        self.assertEqual(strategy.fast_window, 10)
-        self.assertEqual(strategy.slow_window, 30)
+        self.assertEqual(strategy.fast_window, 25)
+        self.assertEqual(strategy.slow_window, 99)
 
     def test_sma_cross_uses_given_parameters(self) -> None:
         strategy = build_strategy("sma_cross", (5, 20))
@@ -28,7 +28,11 @@ class BuildStrategyTests(unittest.TestCase):
             build_strategy("buy_and_hold", (5, 20))
 
     def test_buy_and_hold_needs_no_parameters(self) -> None:
-        self.assertIsInstance(build_strategy("buy_and_hold"), BuyAndHoldStrategy)
+        strategy = build_strategy("buy_and_hold")
+
+        self.assertIsInstance(strategy, BuyAndHoldStrategy)
+        self.assertEqual(strategy.generate_signal(0, None), 1.0)
+        self.assertIsNone(strategy.generate_signal(1, None))
 
     def test_unknown_strategy_is_rejected(self) -> None:
         with self.assertRaises(ValueError):

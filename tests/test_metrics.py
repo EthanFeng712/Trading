@@ -1,11 +1,11 @@
 import unittest
 from datetime import datetime, timedelta
 
-from Trading.src.reports.metrics import calculate_metrics
-from Trading.src.reports.metrics import calculate_annualized_return
-from Trading.src.reports.metrics import calculate_max_drawdown
-from Trading.src.backtest.engine import PositionSide, Trade
-from Trading.src.backtest.engine import BacktestResult, EquityPoint
+from src.reports.metrics import calculate_metrics
+from src.reports.metrics import calculate_annualized_return
+from src.reports.metrics import calculate_max_drawdown
+from src.backtest.engine import PositionSide, Trade
+from src.backtest.engine import BacktestResult, EquityPoint
 
 
 def make_trade(net_pnl: float) -> Trade:
@@ -101,6 +101,22 @@ class MetricsTests(unittest.TestCase):
         metrics = calculate_metrics(result)
 
         self.assertAlmostEqual(metrics.annualized_return, 0.21)
+
+    def test_non_positive_final_cash_has_total_loss_annualized_return(self) -> None:
+        start = datetime(2024, 1, 1)
+        result = BacktestResult(
+            initial_cash=100,
+            final_cash=-10,
+            equity_curve=[
+                EquityPoint(start, 100),
+                EquityPoint(start + timedelta(days=365, hours=6), -10),
+            ],
+            liquidated=True,
+        )
+
+        metrics = calculate_metrics(result)
+
+        self.assertEqual(metrics.annualized_return, -1.0)
      
 
 if __name__ == "__main__":

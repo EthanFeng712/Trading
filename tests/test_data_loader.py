@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from Trading.src.data.data_loader import CsvDataLoader
+from src.data.data_loader import CsvDataLoader
 
 
 class CsvDataLoaderTests(unittest.TestCase):
