@@ -1,8 +1,8 @@
-# Trading v1.6
+# Trading v1.6.1
 
 一个基于本地 CSV 历史数据的量化回测学习项目。项目不依赖交易所 API，也不会发送真实订单。
 
-v1.6 在 O(n) 回测流程上补充了手续费、滑点、资金约束、再平衡容差和做空爆仓处理。
+v1.6.1 在 v1.6 回测功能的基础上，使用 Rich 整理了控制台回测报告和基准指标对比。
 
 ## 快速开始
 
@@ -60,6 +60,7 @@ Trading/
 │   │   ├── __init__.py
 │   │   └── data_loader.py    # CSV 校验、排序、周期推断和 Bar 模型
 │   ├── reports/
+│   │   ├── console.py        # 输出控制台回测报告
 │   │   ├── equity.py         # 绘制权益曲线
 │   │   ├── metrics.py        # 收益、回撤和交易指标
 │   │   └── trade_log.py      # 导出交易日志 CSV
@@ -72,6 +73,7 @@ Trading/
 │       └── indicators.py     # 批量与滚动 SMA 等技术指标
 └── tests/
     ├── test_backtest.py      # 策略工厂与参数装配
+    ├── test_console.py       # 控制台指标比较与颜色判断
     ├── test_data_loader.py   # CSV 与时间戳处理
     ├── test_engine.py        # 多空、加减仓、反手和手续费
     ├── test_indicators.py    # SMA 指标
@@ -117,7 +119,7 @@ timestamp,open,high,low,close,volume
 python -m unittest discover -s tests -v
 ```
 
-测试覆盖 CSV 校验、批量与滚动指标一致性、策略状态重置、目标仓位、多空交易、加减仓、反手、资金约束、滑点、爆仓、回测结束结算和回测指标。
+测试覆盖 CSV 校验、批量与滚动指标一致性、策略状态重置、目标仓位、多空交易、加减仓、反手、资金约束、滑点、爆仓、回测结束结算、回测指标和控制台指标比较。
 
 ## 当前局限
 

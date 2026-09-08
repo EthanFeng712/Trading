@@ -7,28 +7,28 @@ from src.strategies.sma_cross import SmaCrossStrategy
 
 class BuildStrategyTests(unittest.TestCase):
     def test_sma_cross_uses_default_parameters(self) -> None:
-        strategy = build_strategy("sma_cross")
+        strategy = build_strategy("SMA_Cross")
 
         self.assertIsInstance(strategy, SmaCrossStrategy)
         self.assertEqual(strategy.fast_window, 25)
         self.assertEqual(strategy.slow_window, 99)
 
     def test_sma_cross_uses_given_parameters(self) -> None:
-        strategy = build_strategy("sma_cross", (5, 20))
+        strategy = build_strategy("SMA_Cross", (5, 20))
 
         self.assertEqual(strategy.fast_window, 5)
         self.assertEqual(strategy.slow_window, 20)
 
     def test_sma_cross_rejects_incomplete_parameters(self) -> None:
         with self.assertRaises(ValueError):
-            build_strategy("sma_cross", (5,))
+            build_strategy("SMA_Cross", (5,))
 
     def test_buy_and_hold_rejects_parameters(self) -> None:
         with self.assertRaises(ValueError):
-            build_strategy("buy_and_hold", (5, 20))
+            build_strategy("Buy_and_Hold", (5, 20))
 
     def test_buy_and_hold_needs_no_parameters(self) -> None:
-        strategy = build_strategy("buy_and_hold")
+        strategy = build_strategy("Buy_and_Hold")
 
         self.assertIsInstance(strategy, BuyAndHoldStrategy)
         self.assertEqual(strategy.generate_signal(0, None), 1.0)

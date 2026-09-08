@@ -20,9 +20,9 @@ def main() -> None:
                 print("快速均线窗口大小必须小于慢速均线窗口大小，请重新输入。")
             else:
                 check = True
-        run_backtest_demo(strategy_name="sma_cross", param=(fast_window, slow_window))
+        run_backtest_demo(strategy_name="SMA_Cross", param=(fast_window, slow_window))
     elif choice == "2":
-        run_backtest_demo(strategy_name="buy_and_hold")
+        run_backtest_demo(strategy_name="Buy_and_Hold")
     else:
         print("请输入 1 或 2:")
 
