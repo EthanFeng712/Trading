@@ -4,6 +4,7 @@ from ..data.data_loader import CsvDataLoader
 from ..data.data_loader import Bar
 from ..reports.equity import generate_equity_curve_plot
 from ..reports.trade_log import generate_trade_log_csv
+from ..reports.console import comparison_report
 from ..reports.console import print_report
 from ..strategies.base import BaseStrategy
 from ..strategies.buy_and_hold import BuyAndHoldStrategy
@@ -52,7 +53,10 @@ def demo(
     )
     result = engine.run(ohlcv, strategy)
 
-    print_report(strategy_name, result, engine.run(ohlcv, BuyAndHoldStrategy()))
+    if strategy_name == "SMA_Cross":
+        comparison_report(strategy_name, result, engine.run(ohlcv, BuyAndHoldStrategy()))
+    else:
+        print_report(strategy_name, result)
 
     interval = loader.get_interval(ohlcv)
     output_path = generate_equity_curve_plot(result.equity_curve)

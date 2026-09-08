@@ -171,7 +171,7 @@ class SimpleBacktestEngine:
             target_position: float | None = strategy.generate_signal(i, previous_bar)
             if target_position is not None:
                 price = bar.open
-                if target_position > 1.0 or target_position < -1.0:
+                if not -1.0 <= target_position <= 1.0:
                     raise ValueError(f"目标仓位应处于 -1 到 1 之间，策略{strategy.__class__.__name__}返回了{target_position}")
                 position_size = self.position.quantity * price / (self.cash + self.position.quantity * price)
                 equity = self.cash + self.position.quantity * price

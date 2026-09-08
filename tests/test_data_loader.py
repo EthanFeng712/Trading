@@ -39,6 +39,23 @@ class CsvDataLoaderTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 CsvDataLoader(path).load_ohlcv()
 
+    def test_invalid_bars_are_rejected(self) -> None:
+        invalid_rows = {
+            "missing OHLC": "2024-01-01T00:00:00Z,,2,1,1.5,10",
+            "missing timestamp": ",1,2,1,1.5,10",
+            "zero price": "2024-01-01T00:00:00Z,0,2,1,1.5,10",
+            "negative volume": "2024-01-01T00:00:00Z,1,2,1,1.5,-1",
+            "non-finite value": "2024-01-01T00:00:00Z,1,inf,1,1.5,10",
+            "invalid OHLC range": "2024-01-01T00:00:00Z,3,2,1,1.5,10",
+        }
+
+        for case, row in invalid_rows.items():
+            with self.subTest(case=case), TemporaryDirectory() as directory:
+                path = self.write_csv(directory, [row])
+
+                with self.assertRaises(ValueError):
+                    CsvDataLoader(path).load_ohlcv()
+
 
 if __name__ == "__main__":
     unittest.main()
