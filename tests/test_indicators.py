@@ -12,10 +12,16 @@ class SimpleMovingAverageTests(unittest.TestCase):
         )
 
     def test_rejects_non_positive_window(self) -> None:
-        for window in (0, -1):
+        for window in (0, -1, 2.5, True):
             with self.subTest(window=window):
                 with self.assertRaises(ValueError):
                     simple_moving_average([1, 2, 3], window)
+
+    def test_RollingSMA_rejects_non_integer_window(self) -> None:
+        for window in (2.5, True):
+            with self.subTest(window=window):
+                with self.assertRaises(ValueError):
+                    RollingSMA(window)
 
     def test_RollingSMA_updates_as_window_slides(self) -> None:
         sma = RollingSMA(window=3)

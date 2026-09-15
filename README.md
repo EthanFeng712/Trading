@@ -1,17 +1,14 @@
-# Trading v1.7.0 - v1 Final
+# Trading v2.0
 
 一个基于本地 CSV 历史数据的量化回测学习项目。项目不依赖交易所 API，也不会发送真实订单。
 
-v1 完成了一套本地现货回测流程，支持行情数据校验、目标仓位、多空交易、加减仓和反手，并计入手续费、滑点、资金约束与做空爆仓。回测完成后可查看策略指标、Buy-and-Hold 基准对比、权益曲线和交易日志。
+项目支持行情数据校验、目标仓位、多空交易、加减仓和反手，并计入手续费、滑点、资金约束与做空爆仓。回测完成后可查看策略指标、Buy-and-Hold 基准对比、权益曲线和交易日志。v2.0 将回测参数与策略参数分别放入配置对象，并新增 Donchian Channel 策略。
 
 ## 快速开始
 
 需要 Python 3.10 或更高版本。克隆仓库后，在仓库根目录执行：
 
 ```bash
-git clone <仓库地址>
-cd Trading
-
 # 创建虚拟环境
 python -m venv .venv
 ```
@@ -33,17 +30,18 @@ python -m pip install -r requirements.txt
 python Quant.py
 ```
 
-- `1`：SMA 快慢均线交叉策略，可设置快慢均线窗口，默认 `25` 和 `99`
-- `2`：满仓买入并持有策略
+- `1`：SMA 快慢均线交叉策略，可设置窗口（默认 `25` 和 `99`）及目标仓位（默认 `0.2`）
+- `2`：Donchian Channel 策略，可设置窗口（默认 `20`）及目标仓位（默认 `0.2`）
+- `3`：满仓买入并持有策略
 
 ## 文件结构
 
 ```text
 Trading/
+├── .gitignore
 ├── __init__.py
 ├── __main__.py               # 支持 python -m Trading
 ├── Quant.py                  # 命令行入口
-├── .gitignore
 ├── README.md
 ├── requirements.txt          # 第三方依赖
 ├── data/
@@ -55,6 +53,7 @@ Trading/
 │   ├── backtest/
 │   │   ├── __init__.py
 │   │   ├── backtest.py       # 组装并运行回测
+│   │   ├── config.py         # 不可变回测参数及范围校验
 │   │   └── engine.py         # 账户、持仓、成交、滑点和爆仓处理
 │   ├── data/
 │   │   ├── __init__.py
@@ -68,13 +67,16 @@ Trading/
 │   │   ├── __init__.py
 │   │   ├── base.py           # 策略抽象接口
 │   │   ├── buy_and_hold.py   # 买入并持有策略
-│   │   └── sma_cross.py      # SMA 均线交叉策略
+│   │   ├── donchian.py       # Donchian Channel 策略与配置
+│   │   └── sma_cross.py      # SMA 均线交叉策略与配置
 │   └── utils/
 │       └── indicators.py     # 批量与滚动 SMA 等技术指标
 └── tests/
     ├── test_backtest.py      # 策略工厂与参数装配
+    ├── test_config.py        # 回测配置默认值、边界与非法值
     ├── test_console.py       # 控制台指标比较与颜色判断
     ├── test_data_loader.py   # CSV 与时间戳处理
+    ├── test_donchian.py      # Donchian 策略
     ├── test_engine.py        # 多空、加减仓、反手和手续费
     ├── test_indicators.py    # SMA 指标
     ├── test_metrics.py       # 回测指标
@@ -111,7 +113,7 @@ timestamp,open,high,low,close,volume
 
 每次运行会覆盖上一次生成的同名输出文件。
 
-控制台会输出总收益率、年化收益率、最大回撤、交易次数、胜率、平均单笔盈亏和回测结束原因。SMA Cross 报告还会展示相对满仓 Buy-and-Hold 的指标对比和年化超额收益。
+控制台会输出总收益率、年化收益率、最大回撤、交易次数、胜率、平均单笔盈亏和回测结束原因。SMA Cross 与 Donchian Channel 报告还会展示相对满仓 Buy-and-Hold 的指标对比和年化超额收益。
 
 ## 测试
 
@@ -122,7 +124,7 @@ timestamp,open,high,low,close,volume
 python -m unittest discover -s tests -v
 ```
 
-测试覆盖 CSV 校验、非法行情数据、批量与滚动指标一致性、策略状态重置、目标仓位边界、多空交易、加减仓、反手、资金约束、滑点、爆仓、回测结束结算、回测指标、控制台指标比较和交易日志精度。
+测试覆盖 CSV 校验、非法行情数据、配置校验、指标与策略信号、策略状态重置、目标仓位边界、多空交易、加减仓、反手、资金约束、滑点、爆仓、回测结束结算、回测指标、控制台指标比较和交易日志精度。
 
 ## 当前局限
 
@@ -130,5 +132,5 @@ python -m unittest discover -s tests -v
 - 订单按下一根 K 线 `open` 完全成交；滑点为固定比例，尚未模拟订单簿、买卖价差、部分成交和限价单。
 - 做空采用简化的现货借币模型，尚未计算借币利息、分级保证金和额外爆仓费用。
 - 目标仓位限制在 `-1.0` 到 `1.0`，尚未支持杠杆。
-- SMA Cross 使用固定的 `20%` 多空目标仓位，尚未加入动态仓位管理。
+- 当前策略使用可配置但固定的目标仓位，尚未加入动态仓位管理。
 - 尚未支持多标的组合、样本外检验、参数优化、无风险利率比较和夏普比率。

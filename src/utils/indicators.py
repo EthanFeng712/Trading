@@ -2,8 +2,8 @@ from collections import deque
 
 class RollingSMA:
     def __init__(self, window: int):
-        if window <= 0:
-            raise ValueError("SMA 窗口必须为正数")
+        if type(window) is not int or window <= 0:
+            raise ValueError("SMA 窗口必须为正整数")
         self.window = window
         self.sma: float | None = None
         self.closes: deque[float] = deque()
@@ -19,8 +19,8 @@ class RollingSMA:
         return self.sma
 
 def simple_moving_average(values: list[float], window: int) -> list[float | None]:
-    if window <= 0:
-        raise ValueError("window must be positive")
+    if type(window) is not int or window <= 0:
+        raise ValueError("window must be a positive integer")
     sma: list[float | None] = [None] * len(values)
     running_sum = 0.0
     for i, value in enumerate(values):
