@@ -4,6 +4,7 @@ from ..data.data_loader import CsvDataLoader
 from ..data.data_loader import Bar
 from ..reports.equity import generate_equity_curve_plot
 from ..reports.trade_log import generate_trade_log_csv
+from ..reports.html_report import generate_html_report
 from ..reports.console import comparison_report
 from ..reports.console import print_report
 from ..strategies.base import BaseStrategy
@@ -80,15 +81,26 @@ def demo(
     )
 
     result = run_backtest(ohlcv, strategy_name, strategy_config, config)
+    benchmark = None
     if strategy_name == "Buy_and_Hold":
         print_report(strategy_name, result)
     else:
-        comparison_report(strategy_name, result, run_backtest(ohlcv, "Buy_and_Hold", None, config))
+        benchmark = run_backtest(ohlcv, "Buy_and_Hold", None, config)
+        comparison_report(strategy_name, result, benchmark)
 
     interval = loader.get_interval(ohlcv)
     output_path = generate_equity_curve_plot(result.equity_curve)
     log_path = generate_trade_log_csv(log=result.trades, ohlcv=ohlcv, interval=interval)
+    report_path = generate_html_report(
+        result,
+        config=config,
+        strategy_name=strategy_name,
+        source_path=csv_path,
+        benchmark_result=benchmark,
+        interval=interval,
+    )
     print("收益曲线已保存到:", output_path)
     print("交易日志已保存到:", log_path)
+    print("回测报告已保存到:", report_path)
 
     return result
