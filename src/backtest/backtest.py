@@ -11,6 +11,8 @@ from ..strategies.base import BaseStrategy
 from ..strategies.buy_and_hold import BuyAndHoldStrategy
 from ..strategies.sma_cross import SmaCrossStrategy, SmaCrossConfig
 from ..strategies.donchian import DonchianConfig, DonchianStrategy
+from ..strategies.momentum import MomentumConfig, MomentumStrategy
+from ..strategies.mean_reversion import MeanReversionConfig, MeanReversionStrategy
 from .engine import SimpleBacktestEngine
 from .engine import BacktestResult
 from .config import BacktestConfig
@@ -33,6 +35,18 @@ def build_strategy(name: str, strategy_config: object | None = None) -> BaseStra
         if not isinstance(strategy_config, DonchianConfig):
             raise TypeError("Donchian_Channel 需要 DonchianConfig")
         return DonchianStrategy(config=strategy_config)
+    if name == "Momentum":
+        if strategy_config is None:
+            return MomentumStrategy()
+        if not isinstance(strategy_config, MomentumConfig):
+            raise TypeError("Momentum 需要 MomentumConfig")
+        return MomentumStrategy(config=strategy_config)
+    if name == "Mean_Reversion":
+        if strategy_config is None:
+            return MeanReversionStrategy()
+        if not isinstance(strategy_config, MeanReversionConfig):
+            raise TypeError("Mean_Reversion 需要 MeanReversionConfig")
+        return MeanReversionStrategy(config=strategy_config)
 
     raise ValueError(f"未知策略名: {name}")
 
