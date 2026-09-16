@@ -4,7 +4,6 @@ from .donchian import DonchianConfig, DonchianStrategy
 from .sma_cross import SmaCrossConfig, SmaCrossStrategy
 from .momentum import MomentumConfig, MomentumStrategy
 from .mean_reversion import MeanReversionConfig, MeanReversionStrategy
-from .regime import RegimeConfig, RegimeFilteredStrategy
 
 __all__ = [
     "BaseStrategy",
@@ -17,6 +16,4 @@ __all__ = [
     "MomentumStrategy",
     "MeanReversionConfig",
     "MeanReversionStrategy",
-    "RegimeConfig",
-    "RegimeFilteredStrategy",
 ]

@@ -13,7 +13,6 @@ from ..strategies.sma_cross import SmaCrossStrategy, SmaCrossConfig
 from ..strategies.donchian import DonchianConfig, DonchianStrategy
 from ..strategies.momentum import MomentumConfig, MomentumStrategy
 from ..strategies.mean_reversion import MeanReversionConfig, MeanReversionStrategy
-from ..strategies.regime import RegimeConfig, RegimeFilteredStrategy
 from .engine import SimpleBacktestEngine
 from .engine import BacktestResult
 from .config import BacktestConfig
@@ -22,7 +21,6 @@ from .config import BacktestConfig
 def build_strategy(
     name: str,
     strategy_config: object | None = None,
-    regime_config: object | None = None,
 ) -> BaseStrategy:
     if name == "Buy_and_Hold":
         if strategy_config is not None:
@@ -59,11 +57,6 @@ def build_strategy(
     else:
         raise ValueError(f"未知策略名: {name}")
 
-    # 状态过滤仅包裹趋势类策略；Buy_and_Hold 不包裹。
-    if regime_config is not None and name != "Buy_and_Hold":
-        if not isinstance(regime_config, RegimeConfig):
-            raise TypeError("regime_config 需要 RegimeConfig")
-        return RegimeFilteredStrategy(base, regime_config)
     return base
 
 
@@ -72,14 +65,12 @@ def run_backtest(
     strategy_name: str = "Buy_and_Hold",
     strategy_config: object | None = None,
     config: BacktestConfig | None = None,
-    regime_config: object | None = None,
 ) -> BacktestResult:
     """在给定 K 线上执行回测并返回完整结果。
 
     纯函数：无交互输入、无文件输出，可直接用于参数扫描、批量对比与自动化测试。
-    regime_config 非 None 时会用状态过滤器包裹趋势策略。
     """
-    strategy = build_strategy(strategy_name, strategy_config, regime_config)
+    strategy = build_strategy(strategy_name, strategy_config)
     engine = SimpleBacktestEngine(config=config)
     return engine.run(ohlcv, strategy)
 
@@ -88,15 +79,14 @@ def demo(
     csv_path: str | Path | None = None,
     strategy_name: str = "Buy_and_Hold",
     strategy_config: object | None = None,
-    regime_config: object | None = None,
     stop_loss_rate: float | None = None,
     vol_target_annual: float | None = None,
 ) -> BacktestResult:
     """交互式回测演示：读取参数、跑回测、打印报告并落盘产物。
 
     需要程序化调用（无 stdin）时请改用 run_backtest。
-    新增可选参数 regime_config / stop_loss_rate / vol_target_annual 用于启用
-    优化栈（状态过滤 + 对称止损 + 波动率目标化仓位）；默认均为关闭。
+    可选参数 stop_loss_rate / vol_target_annual 用于启用引擎级通用风控
+    （对称单笔止损 / 年化波动率目标化仓位）；默认均为关闭，不影响默认行为。
     """
     if csv_path is None:
         csv_path = Path(__file__).resolve().parents[2] / "data" / "sample.csv"
@@ -119,7 +109,7 @@ def demo(
         vol_target_annual=vol_target_annual,
     )
 
-    result = run_backtest(ohlcv, strategy_name, strategy_config, config, regime_config=regime_config)
+    result = run_backtest(ohlcv, strategy_name, strategy_config, config)
     benchmark = None
     if strategy_name == "Buy_and_Hold":
         print_report(strategy_name, result)
