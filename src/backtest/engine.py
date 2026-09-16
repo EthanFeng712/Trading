@@ -1,6 +1,8 @@
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from math import sqrt
 
 from .config import BacktestConfig
 from ..data.data_loader import Bar
@@ -70,6 +72,7 @@ class SimpleBacktestEngine:
         self.position = Position()
         self.trades = []
         self.liquidated = False
+        self._recent_closes: deque[float] = deque(maxlen=self.config.vol_lookback + 1)
 
     def check_liquidate(self, price: float) -> bool:
         if self.position.quantity < 0:
@@ -96,6 +99,55 @@ class SimpleBacktestEngine:
         self.liquidate(bar, price)
         equity_curve.append(EquityPoint(timestamp=bar.timestamp, equity=self.cash))
         self.liquidated = True
+
+    def _check_stop_loss(self, bar: Bar) -> bool:
+        """按 K 线高低价触发的对称单笔止损；命中则返回 True。
+
+        多头：当 bar.low <= 入场均价*(1-sl) 时以止损价平仓；
+        空头：当 bar.high >= 入场均价*(1+sl) 时以止损价平仓。
+        多空一致处理，修复原引擎「仅空头有强平、多头不对称」的缺口。
+        仅在 config.stop_loss_rate 非 None 时由 run() 调用。
+        """
+        if self.config.stop_loss_rate is None:
+            return False
+        if abs(self.position.quantity) < 1e-8:
+            return False
+        if self.position.total_entry_quantity == 0:
+            return False
+        avg_entry = self.position.total_entry_price / self.position.total_entry_quantity
+        if avg_entry <= 0:
+            return False
+
+        sl = self.config.stop_loss_rate
+        if self.position.quantity > 0:
+            stop = avg_entry * (1.0 - sl)
+            if bar.low <= stop:
+                self.opt(bar, -self.position.quantity, stop)
+                return True
+        else:
+            stop = avg_entry * (1.0 + sl)
+            if bar.high >= stop:
+                self.opt(bar, -self.position.quantity, stop)
+                return True
+        return False
+
+    def _annualized_vol(self) -> float:
+        """基于最近 vol_lookback 根 K 线的日收益标准差，年化（*sqrt(365)）。"""
+        closes = list(self._recent_closes)
+        n = self.config.vol_lookback
+        if len(closes) < n + 1:
+            return 0.0
+        seg = closes[-(n + 1):]
+        rets: list[float] = []
+        for i in range(1, len(seg)):
+            prev = seg[i - 1]
+            if prev > 0:
+                rets.append((seg[i] - prev) / prev)
+        if len(rets) < 2:
+            return 0.0
+        mean = sum(rets) / len(rets)
+        var = sum((r - mean) ** 2 for r in rets) / len(rets)
+        return sqrt(var) * sqrt(365.0)
 
 
     def opt(self, bar: Bar, quantity: float, fill_price: float) -> None:
@@ -151,6 +203,7 @@ class SimpleBacktestEngine:
         self.position = Position()
         self.trades = []
         self.liquidated = False
+        self._recent_closes = deque(maxlen=self.config.vol_lookback + 1)
         strategy.reset()
         equity_curve: list[EquityPoint] = []
         previous_bar: Bar | None = None
@@ -160,11 +213,23 @@ class SimpleBacktestEngine:
                 equity_curve.append(EquityPoint(timestamp=bar.timestamp, equity=self.cash))
                 continue
 
+            self._recent_closes.append(bar.close)
+
             if self.check_liquidate(bar.open):
                 self._liquidate_and_record(bar, bar.open, equity_curve)
                 continue
 
+            if self.config.stop_loss_rate is not None and self._check_stop_loss(bar):
+                equity_curve.append(EquityPoint(timestamp=bar.timestamp, equity=self.cash))
+                previous_bar = bar
+                continue
+
             target_position: float | None = strategy.generate_signal(i, previous_bar)
+            if self.config.vol_target_annual is not None and target_position is not None:
+                ann_vol = self._annualized_vol()
+                if ann_vol > 1e-9:
+                    scale = min(self.config.vol_target_annual / ann_vol, 1.5)
+                    target_position = max(-1.0, min(1.0, target_position * scale))
             if target_position is not None:
                 price = bar.open
                 if not -1.0 <= target_position <= 1.0:

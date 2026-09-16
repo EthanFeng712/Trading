@@ -9,6 +9,11 @@ class BacktestConfig:
     slippage_rate: float = 0.0005
     maintenance_margin_rate: float = 0.1
     rebalance_tolerance: float = 0.001
+    # 以下三项为可选风险控件，默认关闭（None / 0）。仅在显式设置后激活，
+    # 因此不影响任何既有的默认回测路径与测试基线。
+    stop_loss_rate: float | None = None
+    vol_target_annual: float | None = None
+    vol_lookback: int = 20
 
     def __post_init__(self) -> None:
         values = (
@@ -31,3 +36,12 @@ class BacktestConfig:
             raise ValueError("维持保证金率应处于 0 到 20% 之间")
         if not 0.0 <= self.rebalance_tolerance < 1.0:
             raise ValueError("再平衡容差应处于 0 到 1 之间")
+
+        if self.stop_loss_rate is not None:
+            if not isfinite(self.stop_loss_rate) or self.stop_loss_rate <= 0.0:
+                raise ValueError("止损率必须为正数")
+        if self.vol_target_annual is not None:
+            if not isfinite(self.vol_target_annual) or self.vol_target_annual <= 0.0:
+                raise ValueError("波动率目标必须为正数")
+        if type(self.vol_lookback) is not int or self.vol_lookback <= 1:
+            raise ValueError("波动率回看窗口必须为大于 1 的整数")
