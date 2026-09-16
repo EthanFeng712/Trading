@@ -1,6 +1,6 @@
 from .data import CsvDataLoader
 from .strategies import BuyAndHoldStrategy, DonchianConfig, DonchianStrategy, SmaCrossConfig, SmaCrossStrategy
-from .backtest import BacktestResult, SimpleBacktestEngine, Trade, demo
+from .backtest import BacktestResult, SimpleBacktestEngine, Trade, demo, run_backtest
 
 __all__ = [
     "BacktestResult",
@@ -13,4 +13,5 @@ __all__ = [
     "SmaCrossStrategy",
     "Trade",
     "demo",
+    "run_backtest",
 ]

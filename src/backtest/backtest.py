@@ -11,6 +11,7 @@ from ..strategies.buy_and_hold import BuyAndHoldStrategy
 from ..strategies.sma_cross import SmaCrossStrategy, SmaCrossConfig
 from ..strategies.donchian import DonchianConfig, DonchianStrategy
 from .engine import SimpleBacktestEngine
+from .engine import BacktestResult
 from .config import BacktestConfig
 
 
@@ -35,11 +36,30 @@ def build_strategy(name: str, strategy_config: object | None = None) -> BaseStra
     raise ValueError(f"未知策略名: {name}")
 
 
+def run_backtest(
+    ohlcv: list[Bar],
+    strategy_name: str = "Buy_and_Hold",
+    strategy_config: object | None = None,
+    config: BacktestConfig | None = None,
+) -> BacktestResult:
+    """在给定 K 线上执行回测并返回完整结果。
+
+    纯函数：无交互输入、无文件输出，可直接用于参数扫描、批量对比与自动化测试。
+    """
+    strategy = build_strategy(strategy_name, strategy_config)
+    engine = SimpleBacktestEngine(config=config)
+    return engine.run(ohlcv, strategy)
+
+
 def demo(
     csv_path: str | Path | None = None,
     strategy_name: str = "Buy_and_Hold",
     strategy_config: object | None = None,
-) -> None:
+) -> BacktestResult:
+    """交互式回测演示：读取参数、跑回测、打印报告并落盘产物。
+
+    需要程序化调用（无 stdin）时请改用 run_backtest。
+    """
     if csv_path is None:
         csv_path = Path(__file__).resolve().parents[2] / "data" / "sample.csv"
     else:
@@ -48,7 +68,6 @@ def demo(
     loader = CsvDataLoader(csv_path)
     ohlcv: list[Bar] = loader.load_ohlcv()
 
-    strategy = build_strategy(strategy_name, strategy_config)
     cash = float(input("请输入初始资金（默认为 10000）: ") or 10000.0)
     commission_rate = float(input("请输入手续费率（默认为 0.001）: ") or 0.001)
     slippage_rate = float(input("请输入滑点率（默认为 0.0005）: ") or 0.0005)
@@ -58,20 +77,18 @@ def demo(
         commission_rate=commission_rate,
         slippage_rate=slippage_rate,
         maintenance_margin_rate=maintenance_margin_rate,
-        rebalance_tolerance=0.001,
     )
-    engine = SimpleBacktestEngine(config=config)
-    result = engine.run(ohlcv, strategy)
 
-    if strategy_name == "SMA_Cross":
-        comparison_report(strategy_name, result, engine.run(ohlcv, BuyAndHoldStrategy()))
-    elif strategy_name == "Donchian_Channel":
-        comparison_report(strategy_name, result, engine.run(ohlcv, BuyAndHoldStrategy()))
-    else:
+    result = run_backtest(ohlcv, strategy_name, strategy_config, config)
+    if strategy_name == "Buy_and_Hold":
         print_report(strategy_name, result)
+    else:
+        comparison_report(strategy_name, result, run_backtest(ohlcv, "Buy_and_Hold", None, config))
 
     interval = loader.get_interval(ohlcv)
     output_path = generate_equity_curve_plot(result.equity_curve)
     log_path = generate_trade_log_csv(log=result.trades, ohlcv=ohlcv, interval=interval)
     print("收益曲线已保存到:", output_path)
     print("交易日志已保存到:", log_path)
+
+    return result

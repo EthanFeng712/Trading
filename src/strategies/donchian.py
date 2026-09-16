@@ -26,7 +26,7 @@ class DonchianStrategy(BaseStrategy):
     last_minimums: deque[tuple[int, float]]
 
     def __init__(self, config: DonchianConfig | None = None) -> None:
-        self.config = config if not config is None else DonchianConfig()
+        self.config = config if config is not None else DonchianConfig()
         self.last_maximums = deque()
         self.last_minimums = deque()
 
@@ -34,9 +34,11 @@ class DonchianStrategy(BaseStrategy):
         if previous_bar is None:
             return None
 
-        if len(self.last_maximums) > 0 and index - self.last_maximums[0][0] > self.config.window:
+        # 用 while 而非 if：引擎恒以 index 递增 1 调用，两者等价；但一旦出现跳号，
+        # if 每次只淘汰一个过期元素，会让通道混入早已失效的 K 线。
+        while len(self.last_maximums) > 0 and index - self.last_maximums[0][0] > self.config.window:
             self.last_maximums.popleft()
-        if len(self.last_minimums) > 0 and index - self.last_minimums[0][0] > self.config.window:
+        while len(self.last_minimums) > 0 and index - self.last_minimums[0][0] > self.config.window:
             self.last_minimums.popleft()
         highest_previous = self.last_maximums[0][1] if len(self.last_maximums) > 0 else None
         lowest_previous = self.last_minimums[0][1] if len(self.last_minimums) > 0 else None
@@ -50,10 +52,11 @@ class DonchianStrategy(BaseStrategy):
 
         if index <= self.config.window:
             return None
-        if not highest_previous is None and previous_bar.close > highest_previous:
+        if highest_previous is not None and previous_bar.close > highest_previous:
             return self.config.target_size
-        if not lowest_previous is None and previous_bar.close < lowest_previous:
+        if lowest_previous is not None and previous_bar.close < lowest_previous:
             return -self.config.target_size
+        return None
 
     def reset(self) -> None:
         self.last_maximums = deque()

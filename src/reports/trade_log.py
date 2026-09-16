@@ -16,7 +16,8 @@ def generate_trade_log_csv(log: list[Trade], ohlcv: list[Bar], out_path: str | P
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
 
-        day_interval: bool = True if interval is not None and interval.total_seconds() % 86400 == 0 else False
+        # 只有严格的日线才截断到日期；2 日线 / 周线同样能被 86400 整除，截断会丢失时间信息。
+        day_interval: bool = interval == timedelta(days=1)
         for trade in log:
             writer.writerow({
                 "side": trade.side.value,

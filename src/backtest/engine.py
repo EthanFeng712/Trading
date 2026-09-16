@@ -87,6 +87,16 @@ class SimpleBacktestEngine:
             fill_price = price * (1 - self.config.slippage_rate)
         self.opt(bar, quantity, fill_price)
 
+    def _liquidate_and_record(self, bar: Bar, price: float, equity_curve: list[EquityPoint]) -> None:
+        """按给定价格强制平仓，记录当前权益并标记爆仓。
+
+        三条强平路径（开盘跳空、下单后即时触发、盘中触及）都必须执行同样的
+        收尾动作，集中在此以免三处实现漂移。
+        """
+        self.liquidate(bar, price)
+        equity_curve.append(EquityPoint(timestamp=bar.timestamp, equity=self.cash))
+        self.liquidated = True
+
 
     def opt(self, bar: Bar, quantity: float, fill_price: float) -> None:
         if abs(quantity) < 1e-8 or self.liquidated:
@@ -150,11 +160,8 @@ class SimpleBacktestEngine:
                 equity_curve.append(EquityPoint(timestamp=bar.timestamp, equity=self.cash))
                 continue
 
-            flag = self.check_liquidate(bar.open)
-            if flag:
-                self.liquidate(bar, bar.open)
-                equity_curve.append(EquityPoint(timestamp=bar.timestamp, equity=self.cash))
-                self.liquidated = True
+            if self.check_liquidate(bar.open):
+                self._liquidate_and_record(bar, bar.open, equity_curve)
                 continue
 
             target_position: float | None = strategy.generate_signal(i, previous_bar)
@@ -162,8 +169,8 @@ class SimpleBacktestEngine:
                 price = bar.open
                 if not -1.0 <= target_position <= 1.0:
                     raise ValueError(f"目标仓位应处于 -1 到 1 之间，策略{strategy.__class__.__name__}返回了{target_position}")
-                position_size = self.position.quantity * price / (self.cash + self.position.quantity * price)
                 equity = self.cash + self.position.quantity * price
+                position_size = self.position.quantity * price / equity
                 delta_position = target_position - position_size
                 quantity = equity * delta_position / price
                 if quantity > 0:
@@ -172,19 +179,14 @@ class SimpleBacktestEngine:
                     fill_price = price * (1 - self.config.slippage_rate)
                 if abs(delta_position) > self.config.rebalance_tolerance:
                     self.opt(bar, quantity, fill_price)
-                    flag = self.check_liquidate(bar.open)
-                    if flag:
-                        self.liquidate(bar, bar.open)
-                        equity_curve.append(EquityPoint(timestamp=bar.timestamp, equity=self.cash))
-                        self.liquidated = True
+                    if self.check_liquidate(bar.open):
+                        self._liquidate_and_record(bar, bar.open, equity_curve)
                         continue
 
             if self.position.quantity < 0:
                 liquidation_price = self.cash / (abs(self.position.quantity) * (1 + self.config.maintenance_margin_rate))
                 if bar.high >= liquidation_price:
-                    self.liquidate(bar, liquidation_price)
-                    equity_curve.append(EquityPoint(timestamp=bar.timestamp, equity=self.cash))
-                    self.liquidated = True
+                    self._liquidate_and_record(bar, liquidation_price, equity_curve)
                     continue
 
             equity_curve.append(EquityPoint(timestamp=bar.timestamp, equity=self.cash + self.position.quantity * bar.close))
