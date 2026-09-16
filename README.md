@@ -72,7 +72,7 @@ Trading/
 │   └── utils/
 │       └── indicators.py     # 批量与滚动 SMA 等技术指标
 └── tests/
-    ├── test_backtest.py      # 策略工厂与参数装配
+    ├── test_buy_and_hold.py  # 买入并持有策略
     ├── test_config.py        # 回测配置默认值、边界与非法值
     ├── test_console.py       # 控制台指标比较与颜色判断
     ├── test_data_loader.py   # CSV 与时间戳处理

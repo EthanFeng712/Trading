@@ -1,8 +1,10 @@
+from collections import deque
 from dataclasses import dataclass
+from typing import ClassVar
 
+from ..data.data_loader import Bar
 from ..utils.indicators import RollingSMA
 from .base import BaseStrategy
-from ..data.data_loader import Bar
 
 
 @dataclass(frozen=True)
@@ -12,8 +14,12 @@ class SmaCrossConfig:
     target_size: float = 0.2
 
     def __post_init__(self) -> None:
-        if (type(self.fast_window) is not int or self.fast_window <= 0
-                or type(self.slow_window) is not int or self.slow_window <= 0):
+        if (
+            type(self.fast_window) is not int
+            or self.fast_window <= 0
+            or type(self.slow_window) is not int
+            or self.slow_window <= 0
+        ):
             raise ValueError("SMA 窗口必须为正整数")
         if self.fast_window >= self.slow_window:
             raise ValueError("快线窗口必须小于慢线窗口")
@@ -21,18 +27,18 @@ class SmaCrossConfig:
             raise ValueError("目标仓位大小应该处于 0 到 1 之间")
 
 
-
 class SmaCrossStrategy(BaseStrategy):
+    name: ClassVar[str] = "SMA Cross"
     config: SmaCrossConfig
 
     def __init__(self, config: SmaCrossConfig | None = None) -> None:
         self.config = config if config is not None else SmaCrossConfig()
         self.fast = RollingSMA(self.config.fast_window)
         self.slow = RollingSMA(self.config.slow_window)
-        self.fast_sma: list[float | None] = []
-        self.slow_sma: list[float | None] = []
+        self.fast_sma: deque[float | None] = deque(maxlen=2)
+        self.slow_sma: deque[float | None] = deque(maxlen=2)
 
-    def generate_signal(self, _index: int, previous_bar: Bar | None) -> float | None:
+    def generate_signal(self, index: int, previous_bar: Bar | None) -> float | None:
         if previous_bar is None:
             return None
 
@@ -56,5 +62,5 @@ class SmaCrossStrategy(BaseStrategy):
     def reset(self) -> None:
         self.fast = RollingSMA(self.config.fast_window)
         self.slow = RollingSMA(self.config.slow_window)
-        self.fast_sma = []
-        self.slow_sma = []
+        self.fast_sma = deque(maxlen=2)
+        self.slow_sma = deque(maxlen=2)

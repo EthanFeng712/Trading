@@ -1,11 +1,13 @@
 if __package__:
     from .src.backtest.backtest import demo as run_backtest_demo
-    from .src.strategies.sma_cross import SmaCrossConfig
-    from .src.strategies.donchian import DonchianConfig
+    from .src.strategies.buy_and_hold import BuyAndHoldStrategy
+    from .src.strategies.sma_cross import SmaCrossStrategy, SmaCrossConfig
+    from .src.strategies.donchian import DonchianStrategy, DonchianConfig
 else:
     from src.backtest.backtest import demo as run_backtest_demo
-    from src.strategies.sma_cross import SmaCrossConfig
-    from src.strategies.donchian import DonchianConfig
+    from src.strategies.buy_and_hold import BuyAndHoldStrategy
+    from src.strategies.sma_cross import SmaCrossStrategy, SmaCrossConfig
+    from src.strategies.donchian import DonchianStrategy, DonchianConfig
 
 
 def prompt_sma_config() -> SmaCrossConfig:
@@ -31,28 +33,23 @@ def prompt_donchian_config() -> DonchianConfig:
 
 def main() -> None:
     print("请选择运行方式：")
-    print("1. 本地回测演示（Sma交叉策略）")
-    print("2. 本地回测演示（DonChian Channel策略）")
+    print("1. 本地回测演示（SMA Cross 策略）")
+    print("2. 本地回测演示（Donchian Channel 策略）")
     print("3. 本地回测演示（满仓买入并持有策略）")
     choice = input("输入数字:").strip()
     if choice == "1":
-        config = prompt_sma_config()
         run_backtest_demo(
-            strategy_name="SMA_Cross",
-            strategy_config=config,
+            strategy=SmaCrossStrategy(config=prompt_sma_config()),
         )
     elif choice == "2":
-        config = prompt_donchian_config()
         run_backtest_demo(
-            strategy_name="Donchian_Channel",
-            strategy_config=config,
+            strategy=DonchianStrategy(config=prompt_donchian_config()),
         )
     elif choice == "3":
-        run_backtest_demo(strategy_name="Buy_and_Hold")
+        run_backtest_demo(strategy=BuyAndHoldStrategy())
     else:
         print("请输入数字:")
 
 
 if __name__ == "__main__":
     main()
-

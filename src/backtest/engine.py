@@ -16,10 +16,10 @@ class PositionSide(Enum):
 @dataclass
 class Position:
     side: PositionSide = PositionSide.NONE
-    quantity: float = 0.0 # 持股数
+    quantity: float = 0.0  # 持仓数量
     entry_timestamp: datetime | None = None
-    total_entry_price: float = 0.0 # 累计购入股票价值
-    total_entry_quantity: float = 0.0 # 累计购入股票数量
+    total_entry_price: float = 0.0  # 累计开仓成交额
+    total_entry_quantity: float = 0.0  # 累计开仓数量
     total_exit_price: float = 0.0
     max_quantity: float = 0.0
     equity_when_entry: float = 0.0
@@ -74,7 +74,11 @@ class SimpleBacktestEngine:
     def check_liquidate(self, price: float) -> bool:
         if self.position.quantity < 0:
             equity = self.cash + self.position.quantity * price
-            maintenance_margin = abs(self.position.quantity) * price * self.config.maintenance_margin_rate
+            maintenance_margin = (
+                abs(self.position.quantity)
+                * price
+                * self.config.maintenance_margin_rate
+            )
             if equity <= maintenance_margin:
                 return True
         return False
@@ -92,9 +96,22 @@ class SimpleBacktestEngine:
         if abs(quantity) < 1e-8 or self.liquidated:
             return
 
-        if abs(self.position.quantity) > 1e-8 and ((self.position.quantity + quantity) * self.position.quantity <= 0 or abs(self.position.quantity + quantity) < 1e-8): # 平仓
-            self.cash += fill_price * self.position.quantity - fill_price * self.config.commission_rate * abs(self.position.quantity)
-            self.position.commission += fill_price * self.config.commission_rate * abs(self.position.quantity)
+        closes_position = (
+            (self.position.quantity + quantity) * self.position.quantity <= 0
+            or abs(self.position.quantity + quantity) < 1e-8
+        )
+        if abs(self.position.quantity) > 1e-8 and closes_position:
+            self.cash += (
+                fill_price * self.position.quantity
+                - fill_price
+                * self.config.commission_rate
+                * abs(self.position.quantity)
+            )
+            self.position.commission += (
+                fill_price
+                * self.config.commission_rate
+                * abs(self.position.quantity)
+            )
             self.position.total_exit_price += fill_price * abs(self.position.quantity)
             pnl = self.cash - self.position.equity_when_entry
             entry_timestamp = self.position.entry_timestamp
@@ -108,32 +125,50 @@ class SimpleBacktestEngine:
                 average_exit_price=self.position.total_exit_price / self.position.total_entry_quantity if self.position.total_entry_quantity != 0 else 0.0,
                 cumulative_quantity=self.position.total_entry_quantity,
                 max_quantity=self.position.max_quantity,
-                count=self.position.count+1,
-                gross_pnl=pnl+self.position.commission,
+                count=self.position.count + 1,
+                gross_pnl=pnl + self.position.commission,
                 commission=self.position.commission,
                 net_pnl=pnl
             ))
             quantity += self.position.quantity
             self.position = Position()
 
-        if quantity > 1e-8 and self.position.quantity >= 0 and self.cash < fill_price * quantity + fill_price * self.config.commission_rate * abs(quantity):
+        required_cash = (
+            fill_price * quantity
+            + fill_price * self.config.commission_rate * abs(quantity)
+        )
+        if (
+            quantity > 1e-8
+            and self.position.quantity >= 0
+            and self.cash < required_cash
+        ):
             quantity = self.cash / (fill_price * (1 + self.config.commission_rate))
         if abs(quantity) < 1e-8:
             return
 
-        if self.position.quantity == 0: # 反开
-            self.position.side = PositionSide.LONG if quantity > 0 else PositionSide.SHORT
+        if self.position.quantity == 0:  # 创建新持仓
+            self.position.side = (
+                PositionSide.LONG if quantity > 0 else PositionSide.SHORT
+            )
             self.position.entry_timestamp = bar.timestamp
             self.position.equity_when_entry = self.cash
         self.position.quantity += quantity
         if quantity * self.position.quantity > 0:
             self.position.total_entry_quantity += abs(quantity)
             self.position.total_entry_price += fill_price * abs(quantity)
-            self.position.max_quantity = max(self.position.max_quantity, abs(self.position.quantity))
+            self.position.max_quantity = max(
+                self.position.max_quantity,
+                abs(self.position.quantity),
+            )
         if quantity * self.position.quantity < 0:
             self.position.total_exit_price += fill_price * abs(quantity)
-        self.position.commission += fill_price * self.config.commission_rate * abs(quantity)
-        self.cash -= fill_price * quantity + fill_price * self.config.commission_rate * abs(quantity)
+        self.position.commission += (
+            fill_price * self.config.commission_rate * abs(quantity)
+        )
+        self.cash -= (
+            fill_price * quantity
+            + fill_price * self.config.commission_rate * abs(quantity)
+        )
         self.position.count += 1
 
     def run(self, ohlcv: list[Bar], strategy: BaseStrategy) -> BacktestResult:

@@ -60,8 +60,10 @@ class SmaCrossStrategyTests(unittest.TestCase):
 
         self.assertIsNone(strategy.fast.sma)
         self.assertIsNone(strategy.slow.sma)
-        self.assertEqual(strategy.fast_sma, [])
-        self.assertEqual(strategy.slow_sma, [])
+        self.assertEqual(len(strategy.fast_sma), 0)
+        self.assertEqual(len(strategy.slow_sma), 0)
+        self.assertEqual(strategy.fast_sma.maxlen, 2)
+        self.assertEqual(strategy.slow_sma.maxlen, 2)
         self.assertEqual(len(strategy.fast.closes), 0)
         self.assertEqual(len(strategy.slow.closes), 0)
 

@@ -8,37 +8,13 @@ from ..reports.console import comparison_report
 from ..reports.console import print_report
 from ..strategies.base import BaseStrategy
 from ..strategies.buy_and_hold import BuyAndHoldStrategy
-from ..strategies.sma_cross import SmaCrossStrategy, SmaCrossConfig
-from ..strategies.donchian import DonchianConfig, DonchianStrategy
 from .engine import SimpleBacktestEngine
 from .config import BacktestConfig
 
 
-def build_strategy(name: str, strategy_config: object | None = None) -> BaseStrategy:
-    if name == "Buy_and_Hold":
-        if strategy_config is not None:
-            raise ValueError("BuyAndHoldStrategy 不接受策略配置")
-        return BuyAndHoldStrategy()
-    if name == "SMA_Cross":
-        if strategy_config is None:
-            return SmaCrossStrategy()
-        if not isinstance(strategy_config, SmaCrossConfig):
-            raise TypeError("SMA_Cross 需要 SmaCrossConfig")
-        return SmaCrossStrategy(config=strategy_config)
-    if name == "Donchian_Channel":
-        if strategy_config is None:
-            return DonchianStrategy()
-        if not isinstance(strategy_config, DonchianConfig):
-            raise TypeError("Donchian_Channel 需要 DonchianConfig")
-        return DonchianStrategy(config=strategy_config)
-
-    raise ValueError(f"未知策略名: {name}")
-
-
 def demo(
     csv_path: str | Path | None = None,
-    strategy_name: str = "Buy_and_Hold",
-    strategy_config: object | None = None,
+    strategy: BaseStrategy | None = None,
 ) -> None:
     if csv_path is None:
         csv_path = Path(__file__).resolve().parents[2] / "data" / "sample.csv"
@@ -48,7 +24,6 @@ def demo(
     loader = CsvDataLoader(csv_path)
     ohlcv: list[Bar] = loader.load_ohlcv()
 
-    strategy = build_strategy(strategy_name, strategy_config)
     cash = float(input("请输入初始资金（默认为 10000）: ") or 10000.0)
     commission_rate = float(input("请输入手续费率（默认为 0.001）: ") or 0.001)
     slippage_rate = float(input("请输入滑点率（默认为 0.0005）: ") or 0.0005)
@@ -61,14 +36,13 @@ def demo(
         rebalance_tolerance=0.001,
     )
     engine = SimpleBacktestEngine(config=config)
-    result = engine.run(ohlcv, strategy)
 
-    if strategy_name == "SMA_Cross":
-        comparison_report(strategy_name, result, engine.run(ohlcv, BuyAndHoldStrategy()))
-    elif strategy_name == "Donchian_Channel":
-        comparison_report(strategy_name, result, engine.run(ohlcv, BuyAndHoldStrategy()))
+    if strategy is None or isinstance(strategy, BuyAndHoldStrategy):
+        result = engine.run(ohlcv, BuyAndHoldStrategy())
+        print_report("Buy and Hold", result=result)
     else:
-        print_report(strategy_name, result)
+        result = engine.run(ohlcv, strategy)
+        comparison_report(strategy.name, result, engine.run(ohlcv, BuyAndHoldStrategy()))
 
     interval = loader.get_interval(ohlcv)
     output_path = generate_equity_curve_plot(result.equity_curve)

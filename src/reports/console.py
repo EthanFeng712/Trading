@@ -99,7 +99,7 @@ def print_report(strategy_name: str, result: BacktestResult) -> None:
     metrics: Metrics = calculate_metrics(result)
 
     table = Table(
-        title=f"{strategy_name.replace('_', ' ')} 策略回测报告",
+        title=f"{strategy_name} 策略回测报告",
         title_style="bold",
         box=box.SIMPLE_HEAD,
         header_style="bold cyan",
