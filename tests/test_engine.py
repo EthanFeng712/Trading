@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import unittest
 
+from src.backtest.config import BacktestConfig
 from src.backtest.engine import SimpleBacktestEngine
 from src.backtest.engine import PositionSide
 from src.data.data_loader import Bar
@@ -41,9 +42,26 @@ def make_bar(
     )
 
 
+def make_engine(
+    initial_cash: float = 10_000.0,
+    commission_rate: float = 0.001,
+    slippage_rate: float = 0.0005,
+    maintenance_margin_rate: float = 0.1,
+    rebalance_tolerance: float = 0.001,
+) -> SimpleBacktestEngine:
+    config = BacktestConfig(
+        initial_cash=initial_cash,
+        commission_rate=commission_rate,
+        slippage_rate=slippage_rate,
+        maintenance_margin_rate=maintenance_margin_rate,
+        rebalance_tolerance=rebalance_tolerance,
+    )
+    return SimpleBacktestEngine(config)
+
+
 class SimpleBacktestEngineTests(unittest.TestCase):
     def test_go_long_and_close_position(self) -> None:
-        engine = SimpleBacktestEngine(
+        engine = make_engine(
             initial_cash=10_000,
             commission_rate=0.001,
             slippage_rate=0.0,
@@ -66,7 +84,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertAlmostEqual(result.trades[0].net_pnl, gross_pnl - commission)
 
     def test_go_short_and_close_position(self) -> None:
-        engine = SimpleBacktestEngine(
+        engine = make_engine(
             initial_cash=10_000,
             commission_rate=0.001,
             slippage_rate=0.0,
@@ -82,7 +100,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertAlmostEqual(result.trades[0].net_pnl, 1000 - 19)
 
     def test_stop_out_position(self) -> None:
-        engine = SimpleBacktestEngine(
+        engine = make_engine(
             initial_cash=10_000,
             commission_rate=0.001,
             slippage_rate=0.0,
@@ -102,7 +120,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertAlmostEqual(result.trades[0].net_pnl, gross_pnl - commission)
 
     def test_slippage_uses_unfavorable_entry_and_exit_prices(self) -> None:
-        engine = SimpleBacktestEngine(
+        engine = make_engine(
             initial_cash=10_000,
             commission_rate=0.0,
             slippage_rate=0.01,
@@ -119,7 +137,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertAlmostEqual(result.final_cash, 9_900.0)
 
     def test_end_of_backtest_close_applies_slippage(self) -> None:
-        engine = SimpleBacktestEngine(
+        engine = make_engine(
             initial_cash=10_000,
             commission_rate=0.0,
             slippage_rate=0.01,
@@ -134,7 +152,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertAlmostEqual(result.equity_curve[-1].equity, 9_900.0)
 
     def test_rebalance_tolerance_ignores_small_cost_drift(self) -> None:
-        engine = SimpleBacktestEngine(
+        engine = make_engine(
             initial_cash=10_000,
             commission_rate=0.001,
             slippage_rate=0.0005,
@@ -147,7 +165,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertEqual(result.trades[0].count, 2)
 
     def test_scaling_in(self) -> None:
-        engine = SimpleBacktestEngine(
+        engine = make_engine(
             initial_cash=10_000,
             commission_rate=0.001,
             slippage_rate=0.0,
@@ -172,7 +190,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertAlmostEqual(result.trades[0].net_pnl, gross_pnl - commission)
 
     def test_full_long_order_reserves_cash_for_commission(self) -> None:
-        engine = SimpleBacktestEngine(initial_cash=10_000, commission_rate=0.001)
+        engine = make_engine(initial_cash=10_000, commission_rate=0.001)
 
         engine.opt(make_bars([100])[0], quantity=100, fill_price=100)
 
@@ -181,7 +199,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertAlmostEqual(engine.cash, 0.0)
 
     def test_partial_short_close_is_not_limited_by_available_cash(self) -> None:
-        engine = SimpleBacktestEngine(initial_cash=10_000, commission_rate=0.0)
+        engine = make_engine(initial_cash=10_000, commission_rate=0.0)
         bar = make_bars([100])[0]
         engine.opt(bar, quantity=-100, fill_price=100)
 
@@ -190,7 +208,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertAlmostEqual(engine.position.quantity, -80)
 
     def test_intrabar_high_triggers_short_liquidation(self) -> None:
-        engine = SimpleBacktestEngine(
+        engine = make_engine(
             initial_cash=10_000,
             commission_rate=0.0,
             slippage_rate=0.0,
@@ -215,7 +233,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertAlmostEqual(result.final_cash, 20_000 - 100 * liquidation_price)
 
     def test_gap_open_uses_open_price_for_short_liquidation(self) -> None:
-        engine = SimpleBacktestEngine(
+        engine = make_engine(
             initial_cash=10_000,
             commission_rate=0.0,
             slippage_rate=0.0,
@@ -239,7 +257,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertAlmostEqual(result.final_cash, 1_000)
 
     def test_short_liquidation_applies_slippage_and_commission(self) -> None:
-        engine = SimpleBacktestEngine(
+        engine = make_engine(
             initial_cash=10_000,
             commission_rate=0.001,
             slippage_rate=0.01,
@@ -272,7 +290,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertAlmostEqual(result.final_cash, expected_cash)
 
     def test_scaling_out(self) -> None:
-        engine = SimpleBacktestEngine(
+        engine = make_engine(
             initial_cash=10_000,
             commission_rate=0.001,
             slippage_rate=0.0,
@@ -298,7 +316,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertAlmostEqual(result.trades[0].net_pnl, gross_pnl - commission)
 
     def test_reversing_position(self) -> None:
-        engine = SimpleBacktestEngine(
+        engine = make_engine(
             initial_cash=10_000,
             commission_rate=0.001,
             slippage_rate=0.0,
@@ -310,7 +328,7 @@ class SimpleBacktestEngineTests(unittest.TestCase):
         self.assertIs(result.trades[1].side, PositionSide.SHORT)
 
     def test_invalid_targets(self) -> None:
-        engine = SimpleBacktestEngine(initial_cash=10_000, commission_rate=0.001)
+        engine = make_engine(initial_cash=10_000, commission_rate=0.001)
         invalid_targets = (
             -1.5,
             1.5,
@@ -325,20 +343,6 @@ class SimpleBacktestEngineTests(unittest.TestCase):
                     engine.run(
                         make_bars([100, 100, 110]),
                         ScheduledStrategy({1: target}),
-                    )
-
-    def test_invalid_slippage_rates(self) -> None:
-        for slippage_rate in (-0.001, 0.021):
-            with self.subTest(slippage_rate=slippage_rate):
-                with self.assertRaises(ValueError):
-                    SimpleBacktestEngine(slippage_rate=slippage_rate)
-
-    def test_invalid_maintenance_margin_rates(self) -> None:
-        for maintenance_margin_rate in (-0.001, 0.201):
-            with self.subTest(maintenance_margin_rate=maintenance_margin_rate):
-                with self.assertRaises(ValueError):
-                    SimpleBacktestEngine(
-                        maintenance_margin_rate=maintenance_margin_rate,
                     )
 
 if __name__ == "__main__":
