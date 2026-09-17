@@ -1,3 +1,4 @@
+from collections import deque
 from dataclasses import dataclass
 
 from ..utils.indicators import RollingSMA
@@ -29,8 +30,9 @@ class SmaCrossStrategy(BaseStrategy):
         self.config = config if config is not None else SmaCrossConfig()
         self.fast = RollingSMA(self.config.fast_window)
         self.slow = RollingSMA(self.config.slow_window)
-        self.fast_sma: list[float | None] = []
-        self.slow_sma: list[float | None] = []
+        # 仅需最近两根均线值即可判定交叉，用定长 deque 避免无界增长。
+        self.fast_sma: deque[float | None] = deque(maxlen=2)
+        self.slow_sma: deque[float | None] = deque(maxlen=2)
 
     def generate_signal(self, _index: int, previous_bar: Bar | None) -> float | None:
         if previous_bar is None:
@@ -56,5 +58,5 @@ class SmaCrossStrategy(BaseStrategy):
     def reset(self) -> None:
         self.fast = RollingSMA(self.config.fast_window)
         self.slow = RollingSMA(self.config.slow_window)
-        self.fast_sma = []
-        self.slow_sma = []
+        self.fast_sma = deque(maxlen=2)
+        self.slow_sma = deque(maxlen=2)

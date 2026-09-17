@@ -2,7 +2,7 @@
 
 一个基于本地 CSV 历史数据的量化回测学习项目。项目不依赖交易所 API，也不会发送真实订单。
 
-项目支持行情数据校验、目标仓位、多空交易、加减仓和反手，并计入手续费、滑点、资金约束与做空爆仓。回测完成后可查看策略指标、Buy-and-Hold 基准对比、权益曲线和交易日志。v2.0 将回测参数与策略参数分别放入配置对象，并新增 Donchian Channel 策略。
+项目支持行情数据校验、目标仓位、多空交易、加减仓和反手，并计入手续费、滑点、资金约束与做空爆仓。回测完成后可查看策略指标、Buy-and-Hold 基准对比、权益曲线、HTML 回测报告与交易日志可视化仪表盘。v2.0 将回测参数与策略参数分别放入配置对象，并内置 SMA 交叉、Donchian 通道、买入持有、动量趋势跟踪与均值回归五类策略。
 
 ## 快速开始
 
@@ -33,6 +33,8 @@ python Quant.py
 - `1`：SMA 快慢均线交叉策略，可设置窗口（默认 `25` 和 `99`）及目标仓位（默认 `0.2`）
 - `2`：Donchian Channel 策略，可设置窗口（默认 `20`）及目标仓位（默认 `0.2`）
 - `3`：满仓买入并持有策略
+- `4`：动量趋势跟踪策略（Momentum），可设置动量窗口（默认 `20`）、触发阈值（默认 `0.0`）及目标仓位（默认 `0.2`）
+- `5`：均值回归策略（Mean Reversion），可设置均值窗口（默认 `20`）、入场 z 阈值（默认 `2.0`）、平仓 z 阈值（默认 `0.5`）及目标仓位（默认 `0.2`）；默认启用长周期趋势门控（trend_window=90），仅在趋势方向上逆势开仓，以降低均值回归在单边市中的亏损
 
 ## 文件结构
 
@@ -44,6 +46,7 @@ Trading/
 ├── Quant.py                  # 命令行入口
 ├── README.md
 ├── requirements.txt          # 第三方依赖
+├── visualize_trades.py       # 解析 trade_log.csv 生成交易日志可视化仪表盘（内联 SVG）
 ├── data/
 │   └── sample.csv            # Binance BTCUSDT 现货日线示例数据
 ├── output/
@@ -59,8 +62,10 @@ Trading/
 │   │   ├── __init__.py
 │   │   └── data_loader.py    # CSV 校验、排序、周期推断和 Bar 模型
 │   ├── reports/
+│   │   ├── charts.py         # 内联 SVG 图表助手（折线/柱状/堆叠/环形），零依赖
 │   │   ├── console.py        # 输出控制台回测报告
 │   │   ├── equity.py         # 绘制权益曲线
+│   │   ├── html_report.py    # 自包含 HTML 回测报告
 │   │   ├── metrics.py        # 收益、回撤和交易指标
 │   │   └── trade_log.py      # 导出交易日志 CSV
 │   ├── strategies/
@@ -68,20 +73,29 @@ Trading/
 │   │   ├── base.py           # 策略抽象接口
 │   │   ├── buy_and_hold.py   # 买入并持有策略
 │   │   ├── donchian.py       # Donchian Channel 策略与配置
+│   │   ├── mean_reversion.py # 均值回归策略与配置（含长周期趋势门控）
+│   │   ├── momentum.py       # 动量趋势跟踪策略与配置
 │   │   └── sma_cross.py      # SMA 均线交叉策略与配置
 │   └── utils/
 │       └── indicators.py     # 批量与滚动 SMA 等技术指标
 └── tests/
     ├── test_backtest.py      # 策略工厂与参数装配
+    ├── test_buy_and_hold.py  # 买入并持有策略
+    ├── test_charts.py        # 内联 SVG 图表助手
     ├── test_config.py        # 回测配置默认值、边界与非法值
     ├── test_console.py       # 控制台指标比较与颜色判断
     ├── test_data_loader.py   # CSV 与时间戳处理
     ├── test_donchian.py      # Donchian 策略
     ├── test_engine.py        # 多空、加减仓、反手和手续费
+    ├── test_html_report.py   # HTML 报告端到端渲染
     ├── test_indicators.py    # SMA 指标
+    ├── test_mean_reversion.py# 均值回归（z 计分与趋势门控）
     ├── test_metrics.py       # 回测指标
+    ├── test_momentum.py      # 动量趋势跟踪策略
+    ├── test_risk_controls.py # 止损与波动率目标风控
     ├── test_sma_cross.py     # SMA 策略
-    └── test_trade_log.py     # 交易日志精度
+    ├── test_trade_log.py     # 交易日志精度
+    └── test_visualize.py     # 交易日志可视化仪表盘
 ```
 
 ## 数据与回测规则
@@ -110,6 +124,10 @@ timestamp,open,high,low,close,volume
 
 - `output/equity_curve.png`：账户权益曲线。
 - `output/trade_log.csv`：每笔完整交易的方向、时间、均价、累计数量、手续费和盈亏。
+- `output/backtest_report.html`：每次回测结束自动生成的自包含 HTML 报告（内联 SVG，离线可用），含 KPI、权益曲线、逐笔盈亏、多空对比、持仓周期分布与交易明细。
+- `output/trade_dashboard.html`：由 `visualize_trades.py` 解析 `trade_log.csv` 生成的可视化仪表盘（内联 SVG，离线可用），含累计净盈亏曲线、逐笔盈亏、多空占比环形图、年度多空分布、持仓周期分布与交易明细。
+
+所有图表配色遵循 A 股惯例：**盈利（红）/ 亏损（绿）**，与控制台输出（盈利为红、亏损为绿）保持一致。
 
 每次运行会覆盖上一次生成的同名输出文件。
 
@@ -124,7 +142,7 @@ timestamp,open,high,low,close,volume
 python -m unittest discover -s tests -v
 ```
 
-测试覆盖 CSV 校验、非法行情数据、配置校验、指标与策略信号、策略状态重置、目标仓位边界、多空交易、加减仓、反手、资金约束、滑点、爆仓、回测结束结算、回测指标、控制台指标比较和交易日志精度。
+测试覆盖 CSV 校验、非法行情数据、配置校验（含风控边界）、指标与策略信号、策略状态重置、目标仓位边界、多空交易、加减仓、反手、资金约束、滑点、爆仓、回测结束结算、回测指标、控制台指标比较、交易日志精度、内联 SVG 图表助手、HTML 报告端到端渲染、交易日志可视化仪表盘、动量趋势跟踪、均值回归（z 计分与趋势门控）以及止损与波动率目标风控。
 
 ## 当前局限
 

@@ -40,8 +40,12 @@ class BacktestConfig:
         if self.stop_loss_rate is not None:
             if not isfinite(self.stop_loss_rate) or self.stop_loss_rate <= 0.0:
                 raise ValueError("止损率必须为正数")
+            if self.stop_loss_rate > 0.9:
+                raise ValueError("止损率应不超过 0.9（90%）")
         if self.vol_target_annual is not None:
             if not isfinite(self.vol_target_annual) or self.vol_target_annual <= 0.0:
                 raise ValueError("波动率目标必须为正数")
+            if self.vol_target_annual > 2.0:
+                raise ValueError("波动率目标应不超过 2.0（200%）")
         if type(self.vol_lookback) is not int or self.vol_lookback <= 1:
             raise ValueError("波动率回看窗口必须为大于 1 的整数")

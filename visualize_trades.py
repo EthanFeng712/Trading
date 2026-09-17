@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-读取 D:\\trading\\output\\trade_log.csv，解析交易数据并以内联 SVG 仪表盘形式可视化。
+读取 output/trade_log.csv（相对本脚本所在目录），解析交易数据并以内联 SVG 仪表盘形式可视化。
 
 零第三方依赖（仅标准库），输出单一 HTML 文件，完全离线、可直接在浏览器/预览面板打开。
+图表助手与配色复用 src/reports/charts，避免重复实现；本文件仅保留独有的 svg_donut。
 
 配色遵循 A 股惯例：盈利(正)→红，亏损(负)→绿。
 """
@@ -14,18 +15,24 @@ import statistics
 from collections import defaultdict
 from datetime import date
 
-CSV_PATH = pathlib.Path(r"D:\trading\output\trade_log.csv")
-OUT_PATH = pathlib.Path(r"D:\trading\output\trade_dashboard.html")
+from src.reports.charts import (
+    C_LONG,
+    C_LOSS,
+    C_PROFIT,
+    C_SHORT,
+    C_TEXT,
+    _esc,
+    svg_bar,
+    svg_line,
+    svg_stacked,
+)
 
-# 调色板
-C_PROFIT = "#d64545"   # 盈利 → 红
-C_LOSS = "#2e9e5b"     # 亏损 → 绿
-C_LONG = "#3b6fb5"     # 做多
-C_SHORT = "#e0902b"    # 做空
-C_GRID = "#e6eaef"
-C_AXIS = "#9aa6b2"
-C_TEXT = "#33404d"
-C_SUB = "#7a8794"
+HERE = pathlib.Path(__file__).resolve().parent
+CSV_PATH = HERE / "output" / "trade_log.csv"
+OUT_PATH = HERE / "output" / "trade_dashboard.html"
+
+# 柱间距（与原生实现保持一致，约占单格 0.72）
+BAR_GAP = 0.72
 
 
 # --------------------------------------------------------------------------- #
@@ -60,166 +67,6 @@ def load_trades(path: pathlib.Path):
 # --------------------------------------------------------------------------- #
 # SVG 绘图助手（纯字符串，无外部依赖）
 # --------------------------------------------------------------------------- #
-def _esc(s):
-    return html.escape(str(s))
-
-
-def svg_line(ys, *, xlabels=None, w=760, h=360, title="", ylabel="",
-             line_color=C_LONG, area=True, fmt_y=lambda v: f"{v:,.0f}", zero=True):
-    pad_l, pad_r, pad_t, pad_b = 64, 24, 46, 54
-    plot_w = w - pad_l - pad_r
-    plot_h = h - pad_t - pad_b
-    n = len(ys)
-    if n == 0:
-        return ""
-    vals = list(ys) + ([0] if zero else [])
-    ymin, ymax = min(vals), max(vals)
-    if ymin == ymax:
-        ymin -= 1
-        ymax += 1
-    span = ymax - ymin
-    ymax += span * 0.08
-    ymin -= span * 0.08
-
-    def sx(i):
-        return pad_l + (plot_w * (i / (n - 1)) if n > 1 else plot_w / 2)
-
-    def sy(v):
-        return pad_t + plot_h * (1 - (v - ymin) / (ymax - ymin))
-
-    grid = ""
-    for k in range(6):
-        val = ymin + (ymax - ymin) * k / 6
-        y = sy(val)
-        grid += f'<line x1="{pad_l}" y1="{y:.1f}" x2="{w - pad_r}" y2="{y:.1f}" stroke="{C_GRID}" stroke-width="1"/>'
-        grid += f'<text x="{pad_l - 8}" y="{y + 4:.1f}" text-anchor="end" font-size="11" fill="{C_SUB}">{_esc(fmt_y(val))}</text>'
-    if zero and ymin < 0 < ymax:
-        yz = sy(0)
-        grid += f'<line x1="{pad_l}" y1="{yz:.1f}" x2="{w - pad_r}" y2="{yz:.1f}" stroke="{C_AXIS}" stroke-width="1.2"/>'
-
-    pts = [(sx(i), sy(ys[i])) for i in range(n)]
-    d = "M " + " L ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
-    area_d = d + f" L {pts[-1][0]:.1f},{sy(ymin):.1f} L {pts[0][0]:.1f},{sy(ymin):.1f} Z" if area else ""
-    area_svg = f'<path d="{area_d}" fill="{line_color}" fill-opacity="0.10"/>' if area else ""
-    line_svg = f'<path d="{d}" fill="none" stroke="{line_color}" stroke-width="2.2" stroke-linejoin="round"/>'
-
-    xlab = ""
-    if xlabels:
-        step = max(1, n // 8)
-        for i in range(0, n, step):
-            xlab += f'<text x="{sx(i):.1f}" y="{h - pad_b + 18:.1f}" text-anchor="middle" font-size="10" fill="{C_SUB}">{_esc(xlabels[i])}</text>'
-
-    title_svg = f'<text x="{pad_l}" y="24" font-size="14" font-weight="600" fill="{C_TEXT}">{_esc(title)}</text>'
-    yl = ""
-    if ylabel:
-        yc = pad_t + plot_h / 2
-        yl = f'<text x="16" y="{yc:.0f}" font-size="11" fill="{C_SUB}" transform="rotate(-90 16 {yc:.0f})" text-anchor="middle">{_esc(ylabel)}</text>'
-    return (f'<svg viewBox="0 0 {w} {h}" width="100%" preserveAspectRatio="xMidYMid meet">'
-            f'{grid}{area_svg}{line_svg}{xlab}{title_svg}{yl}</svg>')
-
-
-def svg_bar(values, *, labels=None, colors=None, w=760, h=360, title="", ylabel="",
-            fmt_y=lambda v: f"{v:,.0f}", zero=True):
-    pad_l, pad_r, pad_t, pad_b = 64, 24, 46, 54
-    plot_w = w - pad_l - pad_r
-    plot_h = h - pad_t - pad_b
-    n = len(values)
-    if n == 0:
-        return ""
-    vals = list(values) + ([0] if zero else [])
-    ymin, ymax = min(vals), max(vals)
-    if ymin == ymax:
-        ymin -= 1
-        ymax += 1
-    span = ymax - ymin
-    ymax += span * 0.08
-    ymin -= span * 0.08
-
-    def sy(v):
-        return pad_t + plot_h * (1 - (v - ymin) / (ymax - ymin))
-
-    grid = ""
-    for k in range(6):
-        val = ymin + (ymax - ymin) * k / 6
-        y = sy(val)
-        grid += f'<line x1="{pad_l}" y1="{y:.1f}" x2="{w - pad_r}" y2="{y:.1f}" stroke="{C_GRID}" stroke-width="1"/>'
-        grid += f'<text x="{pad_l - 8}" y="{y + 4:.1f}" text-anchor="end" font-size="11" fill="{C_SUB}">{_esc(fmt_y(val))}</text>'
-    if zero and ymin < 0 < ymax:
-        yz = sy(0)
-        grid += f'<line x1="{pad_l}" y1="{yz:.1f}" x2="{w - pad_r}" y2="{yz:.1f}" stroke="{C_AXIS}" stroke-width="1.2"/>'
-
-    bw = plot_w / n * 0.72
-    gap = plot_w / n
-    bars = ""
-    step = max(1, n // 12)
-    for i, v in enumerate(values):
-        x = pad_l + gap * i + (gap - bw) / 2
-        y0 = sy(0)
-        y1 = sy(v)
-        ytop = min(y0, y1)
-        bh = abs(y0 - y1)
-        c = colors[i] if colors else C_LONG
-        bars += f'<rect x="{x:.1f}" y="{ytop:.1f}" width="{bw:.1f}" height="{max(bh, 0):.1f}" fill="{c}" rx="1.5"/>'
-        if labels and i % step == 0:
-            bars += f'<text x="{x + bw / 2:.1f}" y="{h - pad_b + 18:.1f}" text-anchor="middle" font-size="10" fill="{C_SUB}">{_esc(labels[i])}</text>'
-
-    title_svg = f'<text x="{pad_l}" y="24" font-size="14" font-weight="600" fill="{C_TEXT}">{_esc(title)}</text>'
-    yl = ""
-    if ylabel:
-        yc = pad_t + plot_h / 2
-        yl = f'<text x="16" y="{yc:.0f}" font-size="11" fill="{C_SUB}" transform="rotate(-90 16 {yc:.0f})" text-anchor="middle">{_esc(ylabel)}</text>'
-    return (f'<svg viewBox="0 0 {w} {h}" width="100%" preserveAspectRatio="xMidYMid meet">'
-            f'{grid}{bars}{title_svg}{yl}</svg>')
-
-
-def svg_stacked(groups, *, w=760, h=360, title="", ylabel="",
-                seg_colors=(C_LONG, C_SHORT), seg_labels=("做多", "做空")):
-    pad_l, pad_r, pad_t, pad_b = 64, 24, 52, 54
-    plot_w = w - pad_l - pad_r
-    plot_h = h - pad_t - pad_b
-    n = len(groups)
-    totals = [sum(g[1]) for g in groups]
-    ymax = max(totals) if totals else 1
-    ymax = ymax * 1.12 if ymax else 1
-
-    def sy(v):
-        return pad_t + plot_h * (1 - v / ymax)
-
-    grid = ""
-    for k in range(6):
-        val = ymax * k / 6
-        y = sy(val)
-        grid += f'<line x1="{pad_l}" y1="{y:.1f}" x2="{w - pad_r}" y2="{y:.1f}" stroke="{C_GRID}" stroke-width="1"/>'
-        grid += f'<text x="{pad_l - 8}" y="{y + 4:.1f}" text-anchor="end" font-size="11" fill="{C_SUB}">{val:,.0f}</text>'
-
-    bw = plot_w / n * 0.6
-    gap = plot_w / n
-    bars = ""
-    for i, (lab, vals) in enumerate(groups):
-        x = pad_l + gap * i + (gap - bw) / 2
-        ybase = sy(0)
-        for j, v in enumerate(vals):
-            hgt = plot_h * (v / ymax)
-            ytop = ybase - hgt
-            bars += f'<rect x="{x:.1f}" y="{ytop:.1f}" width="{bw:.1f}" height="{max(hgt, 0):.1f}" fill="{seg_colors[j]}"/>'
-            ybase = ytop
-        bars += f'<text x="{x + bw / 2:.1f}" y="{h - pad_b + 18:.1f}" text-anchor="middle" font-size="10" fill="{C_SUB}">{_esc(lab)}</text>'
-
-    legend = ""
-    lx = pad_l
-    for j, lab in enumerate(seg_labels):
-        legend += f'<rect x="{lx}" y="34" width="11" height="11" fill="{seg_colors[j]}"/>'
-        legend += f'<text x="{lx + 15}" y="44" font-size="11" fill="{C_TEXT}">{_esc(lab)}</text>'
-        lx += 15 + len(lab) * 12 + 16
-    title_svg = f'<text x="{pad_l}" y="20" font-size="14" font-weight="600" fill="{C_TEXT}">{_esc(title)}</text>'
-    yl = ""
-    if ylabel:
-        yc = pad_t + plot_h / 2
-        yl = f'<text x="16" y="{yc:.0f}" font-size="11" fill="{C_SUB}" transform="rotate(-90 16 {yc:.0f})" text-anchor="middle">{_esc(ylabel)}</text>'
-    return (f'<svg viewBox="0 0 {w} {h}" width="100%" preserveAspectRatio="xMidYMid meet">'
-            f'{grid}{bars}{legend}{title_svg}{yl}</svg>')
-
-
 def svg_donut(segments, *, w=380, h=300, title="", center_text=None):
     total = sum(s[1] for s in segments)
     cx, cy, r = w / 2, h / 2 - 4, 92
@@ -328,11 +175,11 @@ def build_html(trades, m):
     line_chart = svg_line(m["cum_series"], xlabels=cum_labels, title="累计净盈亏曲线",
                           ylabel="累计净盈亏", line_color=cum_color, fmt_y=fmt_money)
     bar_chart = svg_bar([t["net"] for t in trades], labels=net_labels, colors=net_colors,
-                        title="逐笔净盈亏", ylabel="净盈亏", fmt_y=fmt_signed)
+                        title="逐笔净盈亏", ylabel="净盈亏", fmt_y=fmt_signed, bar_gap=BAR_GAP)
     year_chart = svg_stacked(m["year_groups"], title="年度交易次数（多空分布）",
                              ylabel="交易笔数")
     hist_chart = svg_bar(m["hist_vals"], labels=m["hist_labels"],
-                         title="持仓周期分布", ylabel="交易笔数", fmt_y=lambda v: f"{v:.0f}", zero=False)
+                         title="持仓周期分布", ylabel="交易笔数", fmt_y=lambda v: f"{v:.0f}", zero=False, bar_gap=BAR_GAP)
     donut = svg_donut([("做多", m["long_count"], C_LONG), ("做空", m["short_count"], C_SHORT)],
                       title="多空交易笔数占比", center_text=str(m["n"]))
 
@@ -341,7 +188,7 @@ def build_html(trades, m):
                         labels=["做多", "做空"],
                         colors=[C_LONG, C_SHORT],
                         title="多空累计净盈亏对比", ylabel="净盈亏",
-                        fmt_y=fmt_signed, zero=True)
+                        fmt_y=fmt_signed, zero=True, bar_gap=BAR_GAP)
 
     kpis = [
         ("总交易笔数", str(m["n"]), ""),
@@ -424,7 +271,7 @@ def build_html(trades, m):
 <body>
 <header>
   <h1>交易日志可视化仪表盘</h1>
-  <p>数据源：D:\\trading\\output\\trade_log.csv ｜ 交易区间 {m['date_min']} ~ {m['date_max']} ｜ 共 {m['n']} 笔交易
+  <p>数据源：{CSV_PATH} ｜ 交易区间 {m['date_min']} ~ {m['date_max']} ｜ 共 {m['n']} 笔交易
      ｜ 配色遵循 A 股惯例：<span style="color:var(--red)">盈利(红)</span> / <span style="color:var(--green)">亏损(绿)</span></p>
 </header>
 <div class="wrap">

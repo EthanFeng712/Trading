@@ -7,8 +7,9 @@ from ..backtest.engine import BacktestResult
 from .metrics import Metrics
 from .metrics import calculate_metrics
 
-GOOD_COLOR = "green"
-BAD_COLOR = "red"
+# A 股配色惯例：盈利/占优为红，亏损/劣势为绿，与 HTML 报告层保持一致。
+GOOD_COLOR = "red"
+BAD_COLOR = "green"
 
 def format_str(value: float, benchmark_value: float, format_spec: str, higher_better: bool = True) -> str:
     text = f"{value:{format_spec}}"

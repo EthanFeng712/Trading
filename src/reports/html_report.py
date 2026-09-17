@@ -14,6 +14,8 @@ STRATEGY_LABELS = {
     "Buy_and_Hold": "买入并持有 (Buy & Hold)",
     "SMA_Cross": "SMA 均线交叉",
     "Donchian_Channel": "唐奇安通道 (Donchian)",
+    "Momentum": "动量趋势跟踪 (Momentum)",
+    "Mean_Reversion": "均值回归 (Mean Reversion)",
 }
 
 OUTPUT_NAME = "backtest_report.html"

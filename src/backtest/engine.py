@@ -73,6 +73,10 @@ class SimpleBacktestEngine:
         self.trades = []
         self.liquidated = False
         self._recent_closes: deque[float] = deque(maxlen=self.config.vol_lookback + 1)
+        # 年化波动率目标化所需的滚动收益：用运行和/平方和在 O(1) 内递推。
+        self._vol_returns: deque[float] = deque(maxlen=self.config.vol_lookback)
+        self._vol_sum: float = 0.0
+        self._vol_sumsq: float = 0.0
 
     def check_liquidate(self, price: float) -> bool:
         if self.position.quantity < 0:
@@ -132,21 +136,18 @@ class SimpleBacktestEngine:
         return False
 
     def _annualized_vol(self) -> float:
-        """基于最近 vol_lookback 根 K 线的日收益标准差，年化（*sqrt(365)）。"""
-        closes = list(self._recent_closes)
-        n = self.config.vol_lookback
-        if len(closes) < n + 1:
+        """基于最近 vol_lookback 根 K 线的日收益标准差，年化（*sqrt(365)）。
+
+        返回值由 run() 中递推维护的滚动收益和/平方和在 O(1) 内求得，
+        不再每根 K 线重算 O(vol_lookback)。
+        """
+        n = len(self._vol_returns)
+        if n < 2:
             return 0.0
-        seg = closes[-(n + 1):]
-        rets: list[float] = []
-        for i in range(1, len(seg)):
-            prev = seg[i - 1]
-            if prev > 0:
-                rets.append((seg[i] - prev) / prev)
-        if len(rets) < 2:
+        mean = self._vol_sum / n
+        var = self._vol_sumsq / n - mean * mean
+        if var <= 0.0:
             return 0.0
-        mean = sum(rets) / len(rets)
-        var = sum((r - mean) ** 2 for r in rets) / len(rets)
         return sqrt(var) * sqrt(365.0)
 
 
@@ -204,6 +205,9 @@ class SimpleBacktestEngine:
         self.trades = []
         self.liquidated = False
         self._recent_closes = deque(maxlen=self.config.vol_lookback + 1)
+        self._vol_returns = deque(maxlen=self.config.vol_lookback)
+        self._vol_sum = 0.0
+        self._vol_sumsq = 0.0
         strategy.reset()
         equity_curve: list[EquityPoint] = []
         previous_bar: Bar | None = None
@@ -214,6 +218,19 @@ class SimpleBacktestEngine:
                 continue
 
             self._recent_closes.append(bar.close)
+
+            # 维护滚动日收益（O(1) 递推），供波动率目标化使用。
+            if len(self._recent_closes) >= 2:
+                prev_close = self._recent_closes[-2]
+                if prev_close > 0:
+                    ret = (self._recent_closes[-1] - prev_close) / prev_close
+                    if len(self._vol_returns) == self._vol_returns.maxlen:
+                        old = self._vol_returns[0]
+                        self._vol_sum -= old
+                        self._vol_sumsq -= old * old
+                    self._vol_returns.append(ret)
+                    self._vol_sum += ret
+                    self._vol_sumsq += ret * ret
 
             if self.check_liquidate(bar.open):
                 self._liquidate_and_record(bar, bar.open, equity_curve)

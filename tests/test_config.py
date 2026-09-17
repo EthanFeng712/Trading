@@ -48,6 +48,25 @@ class BacktestConfigTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     BacktestConfig(**config_values)
 
+    def test_rejects_out_of_range_risk_controls(self) -> None:
+        invalid_configs = (
+            {"stop_loss_rate": 0.95},
+            {"stop_loss_rate": 1.0},
+            {"vol_target_annual": 2.1},
+            {"vol_target_annual": 5.0},
+        )
+
+        for config_values in invalid_configs:
+            with self.subTest(config_values=config_values):
+                with self.assertRaises(ValueError):
+                    BacktestConfig(**config_values)
+
+    def test_accepts_risk_control_defaults(self) -> None:
+        config = BacktestConfig(stop_loss_rate=0.15, vol_target_annual=0.4)
+
+        self.assertEqual(config.stop_loss_rate, 0.15)
+        self.assertEqual(config.vol_target_annual, 0.4)
+
     def test_rejects_non_finite_values(self) -> None:
         fields = (
             "initial_cash",

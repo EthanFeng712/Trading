@@ -167,6 +167,8 @@ def svg_stacked(groups, *, w=760, h=360, title="", ylabel="",
     pad_l, pad_r, pad_t, pad_b = 64, 24, 52, 54
     plot_w = w - pad_l - pad_r
     plot_h = h - pad_t - pad_b
+    if not groups:
+        return ""
     n = len(groups)
     totals = [sum(g[1]) for g in groups]
     ymax = max(totals) if totals else 1
